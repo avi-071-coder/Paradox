@@ -104,27 +104,47 @@ export async function POST(request: Request) {
       4. Return ONLY the raw valid JSON string. Do not wrap it in markdown code blocks or write any introductory/concluding text.
     `;
 
-    const response = await ai.models.generateContent({
-      model: "gemini-flash-latest",
-      contents: prompt,
-      config: {
-        responseMimeType: "application/json",
-        maxOutputTokens: 8192,
-      }
-    });
+    let data = null;
+    let attempts = 0;
+    const maxAttempts = 3;
 
-    let responseText = response.text;
-    if (!responseText) {
-      throw new Error("Empty response from Gemini API");
+    while (attempts < maxAttempts) {
+      try {
+        const response = await ai.models.generateContent({
+          model: "gemini-flash-latest",
+          contents: prompt,
+          config: {
+            responseMimeType: "application/json",
+            maxOutputTokens: 8192,
+          }
+        });
+
+        let responseText = response.text;
+        if (!responseText) {
+          throw new Error("Empty response from Gemini API");
+        }
+
+        // Clean up markdown code blocks if the model wrapped the JSON
+        responseText = responseText.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
+
+        data = JSON.parse(responseText);
+        break; // Successfully parsed, break out of loop
+      } catch (parseError) {
+        attempts++;
+        console.warn(`Gemini generation/parsing failed (Attempt ${attempts}/${maxAttempts}). Retrying...`);
+        if (attempts >= maxAttempts) {
+          throw new Error("Max retries reached for Gemini generation.");
+        }
+      }
     }
 
-    // Clean up markdown code blocks if the model wrapped the JSON
-    responseText = responseText.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
+    if (!data) {
+      throw new Error("Failed to generate valid data");
+    }
 
-    const data = JSON.parse(responseText);
     return NextResponse.json(data);
   } catch (error: any) {
-    console.error("Gemini simulation generation failed:", error);
+    console.error("Gemini simulation generation completely failed after retries:", error);
     // If API execution fails or keys are missing/incorrect, fall back gracefully to a robust generator
     return NextResponse.json(getFallbackData(scenario || "Alternate Reality"));
   }
