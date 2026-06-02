@@ -25,7 +25,6 @@ Create a `.env.local` file in the root of the directory and add your API keys:
 GEMINI_API_KEY=your_gemini_api_key_here
 HUGGINGFACE_API_KEY=your_huggingface_access_token_here
 ```
-*(Note: Your Hugging Face token must be a Fine-Grained token with the "Make calls to Inference Providers" permission enabled).*
 
 ### Installation & Running
 
