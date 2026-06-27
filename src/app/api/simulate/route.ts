@@ -16,25 +16,23 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Scenario prompt is required" }, { status: 400 });
     }
 
-    if (!ai) {
-      console.warn("GEMINI_API_KEY is not defined. Using high-fidelity mock data fallback.");
-      return NextResponse.json(getFallbackData(scenario));
-    }
+    const openrouterApiKey = process.env.OPENROUTER_API_KEY || process.env.NEXT_PUBLIC_OPENROUTER_API_KEY;
 
     const prompt = `
-      You are the PARADOX Alternate Reality Simulation Engine.
-      Generate a highly detailed, immersive alternate history simulation data structure in valid JSON format based on the following hypothetical scenario:
+      You are the PARADOX Alternate Reality Simulation Engine. You generate deeply immersive, richly detailed alternate history simulations.
+      Generate a detailed alternate history simulation in valid JSON format based on:
       "${scenario}"
 
-      The JSON response MUST follow this exact TypeScript interface:
+      The JSON MUST follow this schema:
       {
-        "title": string,
-        "description": string,
-        "divergencePoint": string,
+        "title": string, // A short punchy title (3-6 words max)
+        "punchyIntro": string, // A cinematic, aggressive 4-5 sentence paragraph. Be dramatic, visceral, and world-building. Describe the chaos, the new powers, the human cost. Make it gripping.
+        "description": string, // 3-4 sentences painting the alternate world in vivid detail.
+        "divergencePoint": string, // 2-3 sentences on the exact moment reality split and why it mattered.
         "timeline": Array<{
           "year": string,
           "title": string,
-          "description": string,
+          "description": string, // 3-4 vivid, detailed sentences about this event. Describe what happened, who was affected, what changed permanently, and the emotional/human impact.
           "category": "conflict" | "invention" | "politics" | "culture" | "society",
           "impactScore": number // 1-100
         }>,
@@ -48,17 +46,17 @@ export async function POST(request: Request) {
           "architectureStyle": string,
           "population": string,
           "slogan": string,
-          "imagePrompt": string // descriptive prompt for an AI-generated scene representing the civilization flag, capital, or architecture
+          "imagePrompt": string // Short visual prompt for AI image generation
         }>,
         "news": Array<{
-          "headline": string,
+          "headline": string, // A full news headline, 10-15 words
           "source": string,
           "tickerText": string,
           "impact": "critical" | "high" | "moderate"
         }>,
         "stats": {
-          "globalStability": number, // 0-100
-          "techProgress": number, // 0-100
+          "globalStability": number,
+          "techProgress": number,
           "gdpDistribution": Array<{ name: string, value: number }>,
           "militaryIndex": Array<{ name: string, value: number }>
         },
@@ -66,50 +64,57 @@ export async function POST(request: Request) {
           "id": string,
           "name": string,
           "controllingFaction": string,
-          "tensionLevel": number, // 0-100
-          "status": string
+          "tensionLevel": number,
+          "status": string // 2-3 word status description
         }>,
         "survivalOdds": {
-          "survivalChance": number, // 0-100
+          "survivalChance": number,
           "dangerLevel": "Low" | "Medium" | "High" | "Extremely High" | "Absolute Certain Death",
           "likelyProfession": string,
           "socialStatus": string,
-          "tip": string
+          "tip": string // 2-3 sentences of vivid, specific survival advice for someone dropped into this world.
         },
         "documentary": {
-          "narratorSpeech": string,
-          "sceneDescription": string,
+          "narratorSpeech": string, // 3-4 dramatic sentences. Write as if David Attenborough is narrating the fall and rebirth of civilization. Poetic, haunting, deeply human.
+          "sceneDescription": string, // 2-3 sentences describing the visual scene
           "visualTheme": string,
-          "imagePrompt": string // descriptive prompt for a cinematic background matching the scene
+          "imagePrompt": string
         },
         "wikipedia": {
           "title": string,
           "infobox": Array<{ label: string, value: string }>,
-          "intro": string,
-          "sections": Array<{ heading: string, content: string }>
+          "intro": string, // 3-4 sentences, written like a real Wikipedia article intro. Dense with facts, dates, and context.
+          "sections": Array<{ heading: string, content: string }> // IMPORTANT: Each section content MUST be 4-5 detailed sentences. Write like a real encyclopedia. Include specific dates, names, consequences, and historical analysis. This is the most important text in the entire response — make it thorough and substantive.
         },
         "propaganda": Array<{
           "title": string,
-          "slogan": string,
-          "visualDescription": string,
+          "slogan": string, // A punchy 5-8 word propaganda slogan
+          "visualDescription": string, // 2-3 sentences describing the poster
           "faction": string,
-          "imagePrompt": string // descriptive prompt for the propaganda poster
+          "imagePrompt": string
         }>
       }
 
-      CRITICAL JSON FORMATTING RULES:
-      1. Escape all internal double quotes (e.g. "He said \\"hello\\"").
-      2. Do not use trailing commas.
-      3. Keep paragraphs concise. Do not write overly long essays.
-      4. Return ONLY the raw valid JSON string. Do not wrap it in markdown code blocks or write any introductory/concluding text.
+      CRITICAL RULES:
+      1. Escape internal double quotes properly.
+      2. No trailing commas.
+      3. Write RICH, DETAILED text. Every description field must have multiple full sentences. One-liners or single phrases are UNACCEPTABLE. The wikipedia sections especially must be long and detailed (4-5 sentences each).
+      4. Array sizes: "timeline" = exactly 4 items, "civilizations" = exactly 2, "news" = exactly 3, "mapRegions" = exactly 3, "propaganda" = exactly 2, "wikipedia.sections" = exactly 2, "wikipedia.infobox" = exactly 4, "gdpDistribution" = exactly 3, "militaryIndex" = exactly 3.
+      5. Return ONLY the raw JSON. No markdown, no commentary, no introductory text.
     `;
 
     let data = null;
-    let attempts = 0;
-    const maxAttempts = 3;
+    let success = false;
 
-    while (attempts < maxAttempts) {
+    console.log(`[SIMULATION_ENGINE] Running simulation pipeline. GEMINI_API_KEY defined: ${!!apiKey}, OPENROUTER_API_KEY defined: ${!!openrouterApiKey}`);
+
+
+    const deadlineStart = Date.now();
+
+    // Stage 1: Google Gemini API (Direct)
+    if (ai) {
       try {
+        console.log(`[SIMULATION_ENGINE] Stage 1: Attempting direct Google Gemini generation...`);
         const response = await ai.models.generateContent({
           model: "gemini-flash-latest",
           contents: prompt,
@@ -120,34 +125,247 @@ export async function POST(request: Request) {
         });
 
         let responseText = response.text;
-        if (!responseText) {
-          throw new Error("Empty response from Gemini API");
+        if (responseText) {
+          data = robustParseJSON(responseText);
+          success = true;
+          console.log(`[SIMULATION_ENGINE] Stage 1 (Google Gemini) succeeded!`);
+        } else {
+          console.warn(`[SIMULATION_ENGINE] Stage 1 (Google Gemini) returned empty text.`);
         }
+      } catch (err: any) {
+        console.error(`[SIMULATION_ENGINE] Stage 1 (Google Gemini) failed:`, err);
+      }
+    }
 
-        // Clean up markdown code blocks if the model wrapped the JSON
-        responseText = responseText.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
+    // Stage 2: OpenRouter fallback
+    if (!success && openrouterApiKey) {
+      const modelsToTry = [
+        "openrouter/free",
+        "google/gemma-2-9b-it:free",
+        "meta-llama/llama-3.3-70b-instruct:free"
+      ];
+      for (const modelName of modelsToTry) {
+        try {
+          console.log(`[SIMULATION_ENGINE] Stage 2: Attempting OpenRouter model ${modelName}...`);
+          
+          // Generous 60-second timeout per model to ensure we get the full response
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 60000);
+          
+          const orResponse = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+            method: "POST",
+            headers: {
+              "Authorization": `Bearer ${openrouterApiKey}`,
+              "Content-Type": "application/json",
+              "HTTP-Referer": "https://github.com/google/paradox",
+              "X-Title": "Paradox Simulator"
+            },
+            body: JSON.stringify({
+              model: modelName,
+              messages: [
+                {
+                  role: "system",
+                  content: "You are the PARADOX Alternate Reality Simulation Engine. You must return ONLY raw valid JSON matching the requested schema. Never output conversational text, introductory greetings, markdown wrapping, or commentary."
+                },
+                {
+                  role: "user",
+                  content: prompt
+                }
+              ],
+              response_format: { type: "json_object" },
+              max_tokens: 6000
+            }),
+            signal: controller.signal
+          });
+          
+          clearTimeout(timeoutId);
 
-        data = JSON.parse(responseText);
-        break; // Successfully parsed, break out of loop
-      } catch (parseError) {
-        attempts++;
-        console.warn(`Gemini generation/parsing failed (Attempt ${attempts}/${maxAttempts}). Retrying...`);
-        if (attempts >= maxAttempts) {
-          throw new Error("Max retries reached for Gemini generation.");
+          if (orResponse.ok) {
+            const json = await orResponse.json();
+            let content = json.choices?.[0]?.message?.content;
+            if (content) {
+              console.log(`[SIMULATION_ENGINE] Content length received: ${content.length}. Ending characters: ${content.substring(content.length - 200)}`);
+              data = robustParseJSON(content);
+              success = true;
+              console.log(`[SIMULATION_ENGINE] Stage 2 (OpenRouter model ${modelName}) succeeded!`);
+              break; // Break out of the loop since we succeeded
+            } else {
+              console.warn(`[SIMULATION_ENGINE] OpenRouter model ${modelName} returned empty choices content. Full response:`, JSON.stringify(json));
+            }
+          } else {
+            const errText = await orResponse.text();
+            console.error(`[SIMULATION_ENGINE] OpenRouter model ${modelName} returned error status ${orResponse.status}:`, errText);
+          }
+        } catch (err: any) {
+          console.error(`[SIMULATION_ENGINE] Stage 2 (OpenRouter model ${modelName}) threw error:`, err.name === "AbortError" ? `Request timed out (60s)` : err);
         }
       }
     }
 
-    if (!data) {
-      throw new Error("Failed to generate valid data");
+    const totalElapsed = ((Date.now() - deadlineStart) / 1000).toFixed(1);
+    if (success && data) {
+      console.log(`[SIMULATION_ENGINE] Returning AI data in ${totalElapsed}s`);
+      return NextResponse.json(data);
+    } else {
+      console.warn(`[SIMULATION_ENGINE] All active simulation API routes failed after ${totalElapsed}s. Reverting to local fallback data.`);
+      return NextResponse.json(getFallbackData(scenario || "Alternate Reality"));
     }
-
-    return NextResponse.json(data);
   } catch (error: any) {
-    console.error("Gemini simulation generation completely failed after retries:", error);
-    // If API execution fails or keys are missing/incorrect, fall back gracefully to a robust generator
+    console.error("Simulation generation pipeline crashed:", error);
     return NextResponse.json(getFallbackData(scenario || "Alternate Reality"));
   }
+}
+
+function healTruncatedJSON(jsonStr: string): string {
+  let cleaned = jsonStr.trim();
+  
+  // Track open quotes, braces, and brackets
+  let inString = false;
+  let escape = false;
+  let stack: string[] = [];
+  
+  for (let i = 0; i < cleaned.length; i++) {
+    const char = cleaned[i];
+    if (escape) {
+      escape = false;
+      continue;
+    }
+    if (char === '\\') {
+      escape = true;
+      continue;
+    }
+    if (char === '"') {
+      inString = !inString;
+      continue;
+    }
+    if (!inString) {
+      if (char === '{' || char === '[') {
+        stack.push(char);
+      } else if (char === '}') {
+        if (stack[stack.length - 1] === '{') {
+          stack.pop();
+        }
+      } else if (char === ']') {
+        if (stack[stack.length - 1] === '[') {
+          stack.pop();
+        }
+      }
+    }
+  }
+
+  // If we ended inside a string, close the string quote first
+  if (inString) {
+    cleaned += '"';
+  }
+
+  // Pop from stack and close in reverse order
+  while (stack.length > 0) {
+    const lastOpen = stack.pop();
+    cleaned = cleaned.trim();
+    
+    // Clean trailing characters/commas/colons that make JSON invalid before appending closing brackets
+    if (cleaned.endsWith(',')) {
+      cleaned = cleaned.substring(0, cleaned.length - 1);
+    }
+    if (cleaned.endsWith(':')) {
+      cleaned = cleaned.substring(0, cleaned.length - 1).trim();
+      // If we removed a colon, we should also remove the key name if it's there
+      if (cleaned.endsWith('"')) {
+        const lastQuote = cleaned.lastIndexOf('"', cleaned.length - 2);
+        if (lastQuote !== -1) {
+          cleaned = cleaned.substring(0, lastQuote).trim();
+        }
+      }
+      if (cleaned.endsWith(',')) {
+        cleaned = cleaned.substring(0, cleaned.length - 1);
+      }
+    }
+    
+    if (lastOpen === '{') {
+      cleaned += '}';
+    } else if (lastOpen === '[') {
+      cleaned += ']';
+    }
+  }
+  
+  return cleaned;
+}
+
+function robustParseJSON(text: string) {
+  let cleaned = text.trim();
+  
+  // 1. Try simple parse of the whole cleaned text
+  try {
+    return JSON.parse(cleaned);
+  } catch (e) {}
+
+  // 2. Remove markdown wrappers
+  cleaned = cleaned.replace(/^```json\s*/i, "").replace(/```$/, "").trim();
+  try {
+    return JSON.parse(cleaned);
+  } catch (e) {}
+
+  // 3. Find the first '{' or '[' to strip leading conversational text
+  const firstBrace = cleaned.indexOf("{");
+  const firstBracket = cleaned.indexOf("[");
+  let startIdx = -1;
+  if (firstBrace !== -1 && firstBracket !== -1) {
+    startIdx = Math.min(firstBrace, firstBracket);
+  } else if (firstBrace !== -1) {
+    startIdx = firstBrace;
+  } else if (firstBracket !== -1) {
+    startIdx = firstBracket;
+  }
+
+  if (startIdx !== -1) {
+    const fromStart = cleaned.substring(startIdx);
+    
+    // A. Try parsing it directly
+    try {
+      return JSON.parse(fromStart);
+    } catch (e) {}
+
+    // B. Try healing it directly from start index (handles truncation)
+    try {
+      const healed = healTruncatedJSON(fromStart);
+      return JSON.parse(healed);
+    } catch (e) {}
+
+    // C. Try range-based extraction (from first brace/bracket to last brace/bracket)
+    // This handles complete JSON with trailing conversational junk
+    const lastBrace = cleaned.lastIndexOf("}");
+    const lastBracket = cleaned.lastIndexOf("]");
+    let endIdx = -1;
+    if (lastBrace !== -1 && lastBracket !== -1) {
+      endIdx = Math.max(lastBrace, lastBracket);
+    } else if (lastBrace !== -1) {
+      endIdx = lastBrace;
+    } else if (lastBracket !== -1) {
+      endIdx = lastBracket;
+    }
+
+    if (endIdx !== -1 && endIdx > startIdx) {
+      const rangeExtracted = cleaned.substring(startIdx, endIdx + 1);
+      try {
+        return JSON.parse(rangeExtracted);
+      } catch (e) {}
+
+      // Try healing the range-extracted content (in case of double truncation/mess-ups)
+      try {
+        const healedRange = healTruncatedJSON(rangeExtracted);
+        return JSON.parse(healedRange);
+      } catch (e) {}
+      
+      // Try replacing trailing commas in range extracted
+      try {
+        const repaired = rangeExtracted.replace(/,\s*([\]}])/g, "$1");
+        return JSON.parse(repaired);
+      } catch (e) {}
+    }
+  }
+
+  // If everything fails, throw the original parse error
+  throw new Error("Failed to parse JSON even after range-based extraction and healing.");
 }
 
 function getFallbackData(scenario: string) {
@@ -156,35 +374,36 @@ function getFallbackData(scenario: string) {
   
   return {
     title,
+    punchyIntro: `THE WORLD YOU KNOW IS DEAD. Because ${scenario}, the foundational pillars of our timeline have collapsed. In its place, a fragile, hyper-advanced equilibrium has materialized, built on the ashes of what could have been. You are now observing the Divergent Epoch.`,
     description: `A simulated reality exploring the timeline where: "${scenario}". Built by the PARADOX Classified Engine.`,
-    divergencePoint: "Initial divergent event occurred due to timeline fluctuations.",
+    divergencePoint: `The exact moment where reality diverged based on: ${scenario}`,
     timeline: [
       {
-        year: "1 Year Post-DivergencePoint",
+        year: "1 Year Post-Divergence",
         title: "The Initial Fracture",
-        description: "The primary point of divergence creates a rapid geopolitical shift. Former allies declare neutrality as the new order stabilizes.",
+        description: `Following the event where ${scenario}, the primary geopolitical power structures experience a rapid shift. Former allies declare neutrality as the new order stabilizes around this paradigm shift.`,
         category: "politics",
         impactScore: 85
       },
       {
-        year: "10 Years Post-DivergencePoint",
-        title: "Technological Shift",
-        description: "Focus redirects toward alternative energy systems and specialized engineering to sustain the altered world dynamics.",
+        year: "10 Years Post-Divergence",
+        title: "Technological Adaptation",
+        description: `Global focus redirects toward alternative systems to sustain a world where ${scenario}. Specialized engineering and social systems are rapidly deployed.`,
         category: "invention",
         impactScore: 90
       },
       {
-        year: "25 Years Post-DivergencePoint",
+        year: "25 Years Post-Divergence",
         title: "The Great Realignment",
-        description: "New power blocs finalize continental alliances. Ancient territories are reclaimed under modern banners.",
-        category: "politics",
+        description: `New power blocs finalize continental alliances. Ancient territories are reclaimed under modern banners, fully adapting to the reality that ${scenario}.`,
+        category: "society",
         impactScore: 95
       },
       {
-        year: "50 Years Post-DivergencePoint",
-        title: "A Fragile Pax",
-        description: "A state of global equilibrium is established. The world is unrecognizable compared to the prime timeline, yet stable.",
-        category: "society",
+        year: "50 Years Post-Divergence",
+        title: "A Fragile New Equilibrium",
+        description: `A state of global equilibrium is established. The world is unrecognizable compared to the prime timeline, entirely shaped by the long-term consequences of ${scenario}.`,
+        category: "culture",
         impactScore: 78
       }
     ],
@@ -253,11 +472,11 @@ function getFallbackData(scenario: string) {
       dangerLevel: "Medium",
       likelyProfession: "Timeline Data Archivist",
       socialStatus: "Upper-Middle Technocrat",
-      tip: "Avoid high-tension border zones in the Eurasian Core. Maintain high energy credits buffer."
+      tip: "Avoid high-tension border zones in the Eurasian Core at all costs — the military patrols there operate under shoot-first protocols since the Consolidation Decree of Year 18. Keep your Quantum Credit reserves above 500 QCR at all times; citizens below that threshold are flagged for mandatory labor reassignment. If you find yourself near the Meridian border, carry ecological compliance documentation — the Alliance does not recognize Coalition citizenship without it."
     },
     documentary: {
-      narratorSpeech: "In this alternate configuration of history, we see a world that took a radical turn. Stripped of the assumptions of our prime timeline, human civilization rebuilt itself not with steel and steam, but with light and glass.",
-      sceneDescription: "Slow panoramic camera sweep over massive towering biophilic skyscrapers of Neo-Alexandria. Golden hour light hitting glass panels.",
+      narratorSpeech: "In this alternate configuration of history, we see a world that took a radical turn. Stripped of the assumptions of our prime timeline, human civilization rebuilt itself not with steel and steam, but with light and glass. The great cities rose from the ashes of old ideologies, their spires reaching toward a sky that no longer belonged to nations, but to algorithms. And yet, beneath the gleaming surface of this new order, the old human hungers — for power, for meaning, for belonging — still pulse with an urgency that no amount of quantum computation can quiet.",
+      sceneDescription: "Slow panoramic camera sweep over massive towering biophilic skyscrapers of Neo-Alexandria. Golden hour light hitting glass panels. Crowds of citizens in uniform mono-chromatic attire walk along elevated walkways between towers.",
       visualTheme: "Cinematic Warm Amber and Deep Gold tones.",
       imagePrompt: "slow panoramic sweep over massive biophilic skyscrapers, warm sunset glowing on holographic panels, hyper-realistic, highly detailed cinematic screenshot"
     },
@@ -266,17 +485,18 @@ function getFallbackData(scenario: string) {
       infobox: [
         { label: "Founded", value: "25 Years Post-Fracture" },
         { label: "Prime Factions", value: "New Coalition, Meridian Alliance" },
+        { label: "Population", value: "3.8 Billion (est. Year 50)" },
         { label: "Global GDP Status", value: "Stable (92.4 Trillion QCR)" }
       ],
-      intro: "The Divergent Epoch represents the historical era beginning with the Fracture event, which completely restructured global geopolitical alliances, technical advancement, and social organization.",
+      intro: `The Divergent Epoch represents the historical era beginning with the Fracture event caused by ${scenario}, which completely restructured global geopolitical alliances, technical advancement, and social organization. Spanning from Year 0 (the moment of divergence) to the present day, the Epoch is characterized by the collapse of traditional nation-states, the rise of technocratic governance models, and the rapid acceleration of alternative technological paradigms. Historians within the New Coalition classify it as the most significant civilizational reset since the Bronze Age Collapse, while Meridian Alliance scholars argue it represents humanity's first genuine opportunity to build sustainable systems from first principles.`,
       sections: [
         {
           heading: "The Fracture",
-          content: "The initial event that led to the Divergent Epoch remains a subject of archival study. What started as localized timeline fluctuations quickly cascaded into global geopolitical restructuring."
+          content: `The initial event that led to the Divergent Epoch — the moment where ${scenario} — remains a subject of intense archival study and political debate. What started as a seemingly localized disruption to the established order quickly cascaded into a full-scale global geopolitical restructuring, as the power vacuum created by the divergence point drew in competing factions, ideological movements, and opportunistic military actors. Within the first three years, 47 sovereign nations either dissolved, merged, or underwent violent regime changes. The United Nations, unable to adapt to the new reality, formally dissolved in Year 4, replaced by the Provisional Council of Human Continuity. Economic systems based on legacy currencies collapsed within 18 months, forcing the rapid development of algorithmic resource allocation frameworks that would eventually become the Quantum Credit system.`
         },
         {
           heading: "Establishment of the Technocracy",
-          content: "By year 15, traditional governmental models were largely replaced by technocratic assemblies, focusing on algorithmic resource distribution and ecological preservation."
+          content: `By Year 15, traditional governmental models across the former G20 nations were largely replaced by technocratic assemblies that prioritized algorithmic resource distribution, ecological preservation, and population stability over democratic representation. The transition was neither peaceful nor universally accepted — the Resistance Campaigns of Years 8 through 12 saw an estimated 2.3 million casualties across the Eurasian Core alone. However, the demonstrable efficiency of technocratic governance in managing the cascading resource crises of the early Epoch gradually eroded public support for legacy democratic institutions. The New Coalition formalized its constitution in Year 16, establishing the Council of Architects as the supreme governing body, while the Meridian Alliance adopted a more decentralized model based on bioregional autonomy and ecological stewardship.`
         }
       ]
     },
@@ -284,7 +504,7 @@ function getFallbackData(scenario: string) {
       {
         title: "Neo-Alexandria Recruitment",
         slogan: "Secure the Future. Join the Technocracy Assembly today.",
-        visualDescription: "An imposing dark navy poster featuring a stylized holographic eagle silhouette and glowing cyan data streams.",
+        visualDescription: "An imposing dark navy poster featuring a stylized holographic eagle silhouette and glowing cyan data streams. The eagle's wings span the width of the poster, composed entirely of circuit-board patterns and flowing data visualization lines.",
         faction: "The New Coalition",
         imagePrompt: "minimalist propaganda poster for a technocratic empire, holographic digital eagle glowing cyan and deep violet, obsidian background, futuristic constructivism style"
       }
