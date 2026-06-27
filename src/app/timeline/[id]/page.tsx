@@ -1,89 +1,127 @@
 "use client";
 
-import { useEffect, useState, use } from "react";
-import { motion, AnimatePresence } from "framer-motion";
-import { 
-  ShieldAlert, Globe, Radio, TrendingUp, Users, 
-  MapPin, HelpCircle, ArrowLeft, BookOpen, Film, Image as ImageIcon, Sparkles 
-} from "lucide-react";
+import { useEffect, useState, use, useRef } from "react";
 import Link from "next/link";
+import { ArrowLeft } from "lucide-react";
+import { motion, useScroll, useTransform } from "framer-motion";
 
-interface TimelineEvent {
-  year: string;
-  title: string;
-  description: string;
-  category: string;
-  impactScore: number;
+// Client-side instant fallback generator — identical structure to server fallback
+function generateInstantFallback(scenario: string) {
+  const title = `Timeline: ${scenario.replace(/^What if\s+/i, "")}`;
+  return {
+    title,
+    punchyIntro: `THE WORLD YOU KNOW IS DEAD. Because ${scenario}, the foundational pillars of our timeline have collapsed. In its place, a fragile, hyper-advanced equilibrium has materialized, built on the ashes of what could have been. You are now observing the Divergent Epoch.`,
+    description: `A simulated reality exploring the timeline where: "${scenario}". Built by the PARADOX Classified Engine.`,
+    divergencePoint: `The exact moment where reality diverged based on: ${scenario}`,
+    timeline: [
+      { year: "1 Year Post-Divergence", title: "The Initial Fracture", description: `Following the event where ${scenario}, the primary geopolitical power structures experience a rapid shift. Former allies declare neutrality as the new order stabilizes around this paradigm shift.`, category: "politics", impactScore: 85 },
+      { year: "10 Years Post-Divergence", title: "Technological Adaptation", description: `Global focus redirects toward alternative systems to sustain a world where ${scenario}. Specialized engineering and social systems are rapidly deployed.`, category: "invention", impactScore: 90 },
+      { year: "25 Years Post-Divergence", title: "The Great Realignment", description: `New power blocs finalize continental alliances. Ancient territories are reclaimed under modern banners, fully adapting to the reality that ${scenario}.`, category: "society", impactScore: 95 },
+      { year: "50 Years Post-Divergence", title: "A Fragile New Equilibrium", description: `A state of global equilibrium is established. The world is unrecognizable compared to the prime timeline, entirely shaped by the long-term consequences of ${scenario}.`, category: "culture", impactScore: 78 }
+    ],
+    civilizations: [
+      { name: "The New Coalition", capital: "Neo-Alexandria", government: "Technocratic Council", currency: "Quantum Credits (QCR)", militaryRanking: "Tier-1 Superpower", religion: "Secular Rationalism", architectureStyle: "Neo-Futuristic Glassmorphism", population: "1.2 Billion", slogan: "Precision. Progress. Unity.", imagePrompt: "futuristic city" },
+      { name: "The Meridian Alliance", capital: "Aetheria", government: "Federal Republic", currency: "Meridian Aurum", militaryRanking: "Tier-2 Strategic Power", religion: "Pantheistic Ecological System", architectureStyle: "Organic Biophilic Integration", population: "840 Million", slogan: "In Harmony with the Stream.", imagePrompt: "organic biophilic city" }
+    ],
+    news: [
+      { headline: "Quantum Ticker: Stability metrics reach 94.2% across major central hubs.", source: "Classified Broadcast Network", tickerText: "STABILITY_NORMAL // NO DIVERGENCE DETECTED IN SEC-4", impact: "moderate" },
+      { headline: "Continental borders finalized under the Treaty of Neo-Alexandria.", source: "Global Annals", tickerText: "MAPS UPDATED // CHECK TACTICAL OVERLAY", impact: "high" }
+    ],
+    stats: { globalStability: 78, techProgress: 88, gdpDistribution: [{ name: "The New Coalition", value: 55 }, { name: "The Meridian Alliance", value: 30 }, { name: "Independent Zones", value: 15 }], militaryIndex: [{ name: "The New Coalition", value: 92 }, { name: "The Meridian Alliance", value: 68 }, { name: "Independent Zones", value: 35 }] },
+    mapRegions: [
+      { id: "NA", name: "North America Zone", controllingFaction: "The New Coalition", tensionLevel: 15, status: "Secure" },
+      { id: "EU", name: "Eurasian Core", controllingFaction: "The New Coalition", tensionLevel: 45, status: "Military Supervision" },
+      { id: "AF", name: "Meridian Biosphere", controllingFaction: "The Meridian Alliance", tensionLevel: 20, status: "Ecological Sanctuary" }
+    ],
+    survivalOdds: { survivalChance: 68, dangerLevel: "Medium", likelyProfession: "Timeline Data Archivist", socialStatus: "Upper-Middle Technocrat", tip: "Avoid high-tension border zones in the Eurasian Core. Maintain high energy credits buffer." },
+    documentary: { narratorSpeech: "In this alternate configuration of history, we see a world that took a radical turn. Stripped of the assumptions of our prime timeline, human civilization rebuilt itself not with steel and steam, but with light and glass.", sceneDescription: "Slow panoramic camera sweep over massive towering biophilic skyscrapers.", visualTheme: "Cinematic Warm Amber and Deep Gold tones.", imagePrompt: "panoramic sweep over massive biophilic skyscrapers, warm sunset" },
+    wikipedia: { title: "The Divergent Epoch", infobox: [{ label: "Founded", value: "25 Years Post-Fracture" }, { label: "Prime Factions", value: "New Coalition, Meridian Alliance" }, { label: "Global GDP Status", value: "Stable (92.4 Trillion QCR)" }], intro: "The Divergent Epoch represents the historical era beginning with the Fracture event, which completely restructured global geopolitical alliances, technical advancement, and social organization.", sections: [{ heading: "The Fracture", content: "The initial event that led to the Divergent Epoch remains a subject of archival study. What started as localized timeline fluctuations quickly cascaded into global geopolitical restructuring." }, { heading: "Establishment of the Technocracy", content: "By year 15, traditional governmental models were largely replaced by technocratic assemblies, focusing on algorithmic resource distribution and ecological preservation." }] },
+    propaganda: [{ title: "Neo-Alexandria Recruitment", slogan: "Secure the Future. Join the Technocracy Assembly today.", visualDescription: "An imposing dark navy poster featuring a stylized holographic eagle silhouette and glowing cyan data streams.", faction: "The New Coalition", imagePrompt: "minimalist propaganda poster for a technocratic empire" }]
+  };
 }
 
-interface Civilization {
-  name: string;
-  capital: string;
-  government: string;
-  currency: string;
-  militaryRanking: string;
-  religion: string;
-  architectureStyle: string;
-  population: string;
-  slogan: string;
-  imagePrompt?: string;
-}
+// Robust Image Component with Loading State and Fallback
+function DynamicImage({ prompt, className, alt, seed, index = 0 }: { prompt: string, className?: string, alt: string, seed: number, index?: number }) {
+  const [loaded, setLoaded] = useState(false);
+  const [error, setError] = useState(false);
+  const [imgSrc, setImgSrc] = useState<string | null>(null);
 
-interface NewsItem {
-  headline: string;
-  source: string;
-  tickerText: string;
-  impact: string;
-}
+  // Curated Awwwards-tier fallback images if the AI fails or times out
+  const fallbacks = [
+    "https://images.unsplash.com/photo-1605806616949-1e87b487cb2a?auto=format&fit=crop&q=80&w=2000",
+    "https://images.unsplash.com/photo-1518770660439-4636190af475?auto=format&fit=crop&q=80&w=2000",
+    "https://images.unsplash.com/photo-1628155930542-3c7a64e2c833?auto=format&fit=crop&q=80&w=2000",
+    "https://images.unsplash.com/photo-1493246507139-91e8fad9978e?auto=format&fit=crop&q=80&w=2000",
+    "https://images.unsplash.com/photo-1534447677768-be436bb09401?auto=format&fit=crop&q=80&w=2000"
+  ];
+  const fallbackUrl = fallbacks[seed % fallbacks.length];
 
-interface MapRegion {
-  id: string;
-  name: string;
-  controllingFaction: string;
-  tensionLevel: number;
-  status: string;
-}
+  useEffect(() => {
+    let isMounted = true;
+    
+    async function fetchImage() {
+      try {
+        // STAGGER REQUESTS to prevent Pollinations concurrent rate limits (IP Queue Full)
+        // We use the strict index to wait exactly 4 seconds between each fetch
+        const staggerDelay = index * 4000;
+        await new Promise(res => setTimeout(res, staggerDelay));
 
-interface SimulationData {
-  title: string;
-  description: string;
-  divergencePoint: string;
-  timeline: TimelineEvent[];
-  civilizations: Civilization[];
-  news: NewsItem[];
-  stats: {
-    globalStability: number;
-    techProgress: number;
-    gdpDistribution: { name: string; value: number }[];
-    militaryIndex: { name: string; value: number }[];
-  };
-  mapRegions: MapRegion[];
-  survivalOdds: {
-    survivalChance: number;
-    dangerLevel: string;
-    likelyProfession: string;
-    socialStatus: string;
-    tip: string;
-  };
-  documentary: {
-    narratorSpeech: string;
-    sceneDescription: string;
-    visualTheme: string;
-    imagePrompt?: string;
-  };
-  wikipedia: {
-    title: string;
-    infobox: { label: string; value: string }[];
-    intro: string;
-    sections: { heading: string; content: string }[];
-  };
-  propaganda: {
-    title: string;
-    slogan: string;
-    visualDescription: string;
-    faction: string;
-    imagePrompt?: string;
-  }[];
+        if (!isMounted) return;
+
+        const response = await fetch('/api/generate-image', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ prompt })
+        });
+        
+        if (!response.ok) throw new Error('Failed to generate image');
+
+        const blob = await response.blob();
+        const url = URL.createObjectURL(blob);
+        if (isMounted) setImgSrc(url);
+      } catch (err) {
+        console.error("Image generation fallback triggered:", err);
+        if (isMounted) {
+          setError(true);
+          setImgSrc(fallbackUrl);
+        }
+      }
+    }
+    fetchImage();
+    
+    // Cleanup URL
+    return () => {
+      isMounted = false;
+      if (imgSrc && imgSrc.startsWith('blob:')) {
+        URL.revokeObjectURL(imgSrc);
+      }
+    };
+  }, [prompt]); // Do not include fallbackUrl to avoid re-renders
+
+  return (
+    <div className={`relative bg-[#070708] overflow-hidden ${className || ''}`}>
+      {/* Loading Spinner */}
+      {!loaded && !error && (
+        <div className="absolute inset-0 flex flex-col items-center justify-center bg-[#070708] z-0">
+          <div className="w-8 h-8 border-t-2 border-[#ccff00] rounded-full animate-spin mb-4" />
+          <span className="font-mono text-[9px] uppercase tracking-widest text-white/30 text-center px-4">
+            [QUANTUM_CORE]<br/>MATERIALIZING HIGH-RES ASSET...
+          </span>
+        </div>
+      )}
+      
+      {/* The Image */}
+      {imgSrc && (
+        <img
+          src={imgSrc}
+          alt={alt}
+          className={`w-full h-full object-cover transition-opacity duration-1000 ${loaded || error ? 'opacity-100' : 'opacity-0'}`}
+          onLoad={() => setLoaded(true)}
+          onError={() => setError(true)}
+        />
+      )}
+    </div>
+  );
 }
 
 interface PageProps {
@@ -91,29 +129,207 @@ interface PageProps {
   searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 }
 
-export default function TimelineDashboard(props: PageProps) {
+// -------------------------------------------------------------
+// SECTION 1: THE HERO CONDENSE
+// -------------------------------------------------------------
+function HeroCondense({ data, act2Prompt, vectorId }: { data: any, act2Prompt: string, vectorId: string }) {
+  const ref = useRef(null);
+  const { scrollYProgress } = useScroll({
+    target: ref,
+    offset: ["start start", "end start"]
+  });
+
+  // Scale down from full screen to a small box ONLY after the user scrolls past the first fold (progress 0.5 to 0.9)
+  const scale = useTransform(scrollYProgress, [0.5, 0.9], [1, 0.15]);
+  // Round corners as it shrinks
+  const borderRadius = useTransform(scrollYProgress, [0.5, 0.9], ["0vw", "12vw"]);
+  
+
+
+  return (
+    <section ref={ref} className="relative w-full h-[220vh] bg-[#070708]">
+      {/* Sticky Background Box (Condenses LATER) */}
+      <div className="sticky top-0 w-full h-screen overflow-hidden flex items-center justify-center z-0 pointer-events-none">
+        <motion.div 
+          style={{ scale, borderRadius }}
+          className="relative w-full h-full overflow-hidden shadow-[0_0_100px_rgba(0,0,0,1)] bg-black"
+        >
+          {/* Image */}
+          <DynamicImage 
+            prompt={act2Prompt} 
+            alt="Hero Background" 
+            seed={42} 
+            index={0}
+            className="absolute inset-0 w-full h-full opacity-80" 
+          />
+          {/* Solid gradient that stays in the box */}
+          <div className="absolute inset-0 bg-gradient-to-r from-[#070708]/90 via-[#070708]/40 to-transparent" />
+          <div className="absolute inset-0 bg-gradient-to-t from-[#070708] to-transparent opacity-80" />
+        </motion.div>
+      </div>
+
+      {/* Natural Scrolling Foreground Content */}
+      <div className="absolute inset-0 z-10 flex flex-col pointer-events-none">
+        {/* Full-screen content that scrolls up and out of view */}
+        <div className="h-screen w-full max-w-7xl mx-auto px-6 md:px-12 flex flex-col justify-end pb-16 md:pb-24 pointer-events-auto">
+          <div className="max-w-4xl text-white">
+            <div className="font-mono text-[10px] md:text-xs uppercase tracking-widest text-[#ccff00] mb-4 md:mb-6">
+              Divergence Point: {data.divergencePoint}
+            </div>
+            <h2 className="text-[7vw] md:text-[5vw] font-display font-black leading-[0.85] tracking-tighter uppercase mb-4 md:mb-8">
+              {data.title}
+            </h2>
+            <p className="text-sm md:text-xl font-display font-medium leading-snug border-l-4 border-white pl-4 md:pl-6">
+              {data.punchyIntro}
+            </p>
+          </div>
+        </div>
+        
+        {/* Spacer section. As the user scrolls through this, the background condenses */}
+        <div className="h-[120vh]" />
+      </div>
+
+      {/* Floating HUD elements (Fixed at top, stays above all sections) */}
+      <div className="fixed top-0 w-full p-6 md:p-8 z-50 flex justify-between pointer-events-none">
+        <Link 
+          href="/" 
+          className="pointer-events-auto flex items-center gap-2 px-4 py-2.5 border border-white/10 bg-[#070708]/80 backdrop-blur-md text-white hover:bg-white hover:text-black hover:border-white transition-all font-mono text-xs uppercase tracking-widest rounded-none shadow-[0_8px_32px_rgba(0,0,0,0.5)]"
+        >
+          <ArrowLeft className="w-4 h-4" /> <span>Return</span>
+        </Link>
+        <div className="pointer-events-auto text-right px-4 py-2 border border-white/10 bg-[#070708]/80 backdrop-blur-md rounded-none shadow-[0_8px_32px_rgba(0,0,0,0.5)]">
+          <div className="font-mono text-[9px] uppercase tracking-widest text-white/40 mb-0.5">[SYS_LOG: SIMULATING...]</div>
+          <div className="font-mono text-xs uppercase tracking-widest text-[#ccff00] font-bold">STABILITY: {data.stats?.globalStability || 78}%</div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+// -------------------------------------------------------------
+// SECTION 2: THE HORIZONTAL TIMELINE
+// -------------------------------------------------------------
+function HorizontalTimeline({ data, scenarioQuery }: { data: any, scenarioQuery: string }) {
+  const containerRef = useRef(null);
+  const { scrollYProgress } = useScroll({
+    target: containerRef,
+    offset: ["start start", "end end"]
+  });
+
+  // Calculate horizontal translation based on number of items
+  // If there are 4 items, we need to scroll enough to see the last one.
+  const numItems = data.timeline?.length || 1;
+  // A rough estimate: we want to translate by (numItems * 100vw) - 100vw to reach the end.
+  // Using percentages is safer: "-(numItems - 1) * 100%" roughly, but let's use a dynamic viewport calculation.
+  // Or simply map 0->1 to 0% -> -80% (depending on total width).
+  // We'll set the container to have `w-[400vw]` if there are 4 items.
+  const xTransform = useTransform(scrollYProgress, [0, 1], ["0%", `-${100 - (100 / numItems)}%`]);
+
+  return (
+    <section ref={containerRef} className="relative w-full h-[400vh] bg-[#070708]">
+      <div className="sticky top-0 w-full h-screen overflow-hidden flex items-center">
+        
+        {/* Horizontal Track */}
+        <motion.div 
+          style={{ x: xTransform, width: `${numItems * 100}vw` }}
+          className="flex h-full items-center px-12 md:px-32 gap-12 md:gap-32"
+        >
+          
+          {/* Intro Title Card */}
+          <div className="w-[80vw] md:w-[40vw] flex-shrink-0">
+            <h2 className="text-5xl md:text-8xl font-display font-black tracking-tighter uppercase text-white leading-none">
+              TIMELINE<br/>
+              <span className="text-transparent stroke-white" style={{ WebkitTextStroke: '2px white' }}>EVENTS</span>
+            </h2>
+            <div className="w-24 h-[2px] bg-[#ccff00] mt-8" />
+          </div>
+
+          {/* Event Cards */}
+          {data.timeline?.map((event: any, idx: number) => {
+            return (
+              <div 
+                key={idx} 
+                className="w-[85vw] md:w-[45vw] h-[70vh] flex-shrink-0 relative border border-white/10 bg-gradient-to-br from-white/[0.03] to-white/[0.01] backdrop-blur-md overflow-hidden p-8 md:p-12 flex flex-col"
+              >
+                {/* Tactical Dot Matrix Background */}
+                <div 
+                  className="absolute inset-0 opacity-[0.07] pointer-events-none" 
+                  style={{ 
+                    backgroundImage: 'radial-gradient(rgba(255, 255, 255, 0.5) 1px, transparent 1px)', 
+                    backgroundSize: '20px 20px' 
+                  }} 
+                />
+
+                {/* HUD Corner Accents */}
+                <div className="absolute top-0 left-0 w-3 h-3 border-t-2 border-l-2 border-[#ccff00]/40" />
+                <div className="absolute top-0 right-0 w-3 h-3 border-t-2 border-r-2 border-[#ccff00]/40" />
+                <div className="absolute bottom-0 left-0 w-3 h-3 border-b-2 border-l-2 border-[#ccff00]/40" />
+                <div className="absolute bottom-0 right-0 w-3 h-3 border-b-2 border-r-2 border-[#ccff00]/40" />
+
+                {/* Card Content — scrollable area */}
+                <div className="flex flex-col justify-start relative z-10 flex-1 min-h-0 overflow-y-auto pr-2" style={{ scrollbarWidth: 'thin', scrollbarColor: '#ccff00 transparent' }}>
+                  <div className="font-mono text-xs uppercase tracking-widest text-[#ccff00] mb-6 flex items-center justify-between flex-shrink-0">
+                    <span>{event.year} // {event.category}</span>
+                    <span className="text-white/20 text-[9px]">[ IDX: 0{idx + 1} ]</span>
+                  </div>
+                  <h3 className="text-3xl md:text-5xl font-display font-black uppercase tracking-tight mb-6 text-white leading-tight flex-shrink-0">
+                    {event.title}
+                  </h3>
+                  <p className="text-sm md:text-base text-white/70 font-mono leading-relaxed">
+                    {event.description}
+                  </p>
+                </div>
+
+                {/* HUD Card Content Bottom - Impact Metric */}
+                <div className="relative z-10 pt-6 mt-auto border-t border-white/5 flex items-center justify-between font-mono text-[9px] md:text-[10px] uppercase tracking-widest text-white/40 flex-shrink-0">
+                  <span>DIVERGENCE IMPACT</span>
+                  <div className="flex items-center gap-3">
+                    <div className="w-20 md:w-28 h-1 bg-white/10 rounded-full overflow-hidden">
+                      <div 
+                        className="h-full bg-[#ccff00] rounded-full shadow-[0_0_8px_#ccff00]" 
+                        style={{ width: `${event.impactScore || 50}%` }}
+                      />
+                    </div>
+                    <span className="text-[#ccff00] font-bold">{event.impactScore || 50}%</span>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+
+          {/* Buffer Card to ensure smooth scrolling past the last item */}
+          <div className="w-[20vw] flex-shrink-0" />
+
+        </motion.div>
+      </div>
+    </section>
+  );
+}
+
+
+// -------------------------------------------------------------
+// MAIN COMPONENT
+// -------------------------------------------------------------
+export default function TimelineScrollytelling(props: PageProps) {
   const params = use(props.params);
   const searchParams = use(props.searchParams);
   const scenarioQuery = searchParams.q as string || "Alternate History";
 
-  const [data, setData] = useState<SimulationData | null>(null);
+  const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState("overview");
 
   useEffect(() => {
     async function fetchSimulation() {
       try {
         const response = await fetch("/api/simulate", {
           method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
+          headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ scenario: scenarioQuery }),
         });
         const result = await response.json();
         setData(result);
       } catch (err) {
-        console.error("Simulation retrieval error:", err);
+        console.error(err);
       } finally {
         setLoading(false);
       }
@@ -121,531 +337,161 @@ export default function TimelineDashboard(props: PageProps) {
     fetchSimulation();
   }, [scenarioQuery]);
 
+  // Cinematic loading progress
+  const [loadingStage, setLoadingStage] = useState(0);
+  const loadingStages = [
+    "INITIALIZING PARADOX ENGINE...",
+    "SCANNING DIVERGENCE VECTORS...",
+    "RECONSTRUCTING ALTERNATE TIMELINE...",
+    "SIMULATING GEOPOLITICAL CASCADE...",
+    "GENERATING CIVILIZATION DATA...",
+    "COMPILING HISTORICAL ARCHIVES...",
+    "RENDERING REALITY MATRIX...",
+    "FINALIZING SIMULATION..."
+  ];
+
+  useEffect(() => {
+    if (!loading) return;
+    const interval = setInterval(() => {
+      setLoadingStage(prev => (prev + 1) % loadingStages.length);
+    }, 3500);
+    return () => clearInterval(interval);
+  }, [loading]);
+
   if (loading) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center relative">
-        <div className="absolute inset-0 pointer-events-none" />
-        <div className="relative flex flex-col items-center gap-6">
-          <div className="w-16 h-16 border-4 border-t-white border-r-transparent border-b-transparent border-l-transparent rounded-full animate-spin" />
-          <h2 className="text-xl font-mono text-gradient tracking-widest uppercase animate-pulse">
-            Reconstructing Alternate Dimensions...
-          </h2>
+      <div className="min-h-screen bg-[#070708] flex items-center justify-center text-white relative overflow-hidden">
+        {/* Animated grid background */}
+        <div className="absolute inset-0 opacity-[0.03]" style={{ backgroundImage: 'radial-gradient(rgba(204,255,0,0.5) 1px, transparent 1px)', backgroundSize: '40px 40px' }} />
+        
+        {/* Scan line animation */}
+        <div className="absolute inset-0 pointer-events-none">
+          <div className="absolute w-full h-[2px] bg-gradient-to-r from-transparent via-[#ccff00]/30 to-transparent animate-pulse" style={{ top: `${30 + (loadingStage * 5)}%`, transition: 'top 3s ease-in-out' }} />
         </div>
-      </div>
-    );
-  }
 
-  if (!data) {
-    return (
-      <div className="min-h-screen flex flex-col items-center justify-center p-4">
-        <h2 className="text-2xl font-mono text-red-400 mb-4">CRITICAL ERROR: Reality Matrix Corrupted</h2>
-        <Link href="/simulate" className="px-6 py-2 glass-panel hover:bg-white/10 rounded">
-          Return to Terminal
-        </Link>
-      </div>
-    );
-  }
+        <div className="flex flex-col items-center gap-8 z-10">
+          {/* Pulsating core */}
+          <div className="relative w-20 h-20 flex items-center justify-center">
+            <div className="absolute inset-0 border border-[#ccff00]/20 rotate-45 animate-pulse" />
+            <div className="absolute inset-2 border border-[#ccff00]/30 rotate-[30deg]" style={{ animation: 'spin 4s linear infinite reverse' }} />
+            <div className="w-4 h-4 bg-[#ccff00] shadow-[0_0_20px_#ccff00,0_0_40px_rgba(204,255,0,0.5)]" style={{ animation: 'pulse 1.5s ease-in-out infinite' }} />
+          </div>
 
-  return (
-    <div className="min-h-screen relative flex flex-col">
-      {/* Top Banner & Header */}
-      <header className="border-b border-white/10 glass-panel sticky top-0 z-50 px-6 py-4 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 m-4 !rounded-3xl">
-        <div className="flex items-center gap-4">
-          <Link href="/simulate" className="p-2 border border-white/10 hover:border-white/40 rounded-xl transition-colors">
-            <ArrowLeft className="w-5 h-5 text-gray-400 hover:text-white" />
-          </Link>
-          <div>
-            <h1 className="text-xl font-bold tracking-wider text-gradient uppercase flex items-center gap-2">
-              <Sparkles className="w-5 h-5 text-[#00f2fe]" />
-              {data.title}
-            </h1>
-            <p className="text-xs text-gray-300 font-mono mt-0.5">Divergence Point: {data.divergencePoint}</p>
+          {/* Stage text */}
+          <div className="text-center">
+            <div className="font-mono text-[10px] uppercase tracking-[0.3em] text-white/30 mb-3">[QUANTUM_CORE: ACTIVE]</div>
+            <div className="font-mono text-xs uppercase tracking-widest text-[#ccff00] min-h-[1.5em]" style={{ transition: 'opacity 0.5s' }}>
+              {loadingStages[loadingStage]}
+            </div>
+          </div>
+
+          {/* Progress bar */}
+          <div className="w-48 h-[2px] bg-white/10 overflow-hidden">
+            <div className="h-full bg-[#ccff00] shadow-[0_0_8px_#ccff00]" style={{ width: `${Math.min(95, (loadingStage + 1) * 12)}%`, transition: 'width 3s ease-out' }} />
           </div>
         </div>
-
-        <div className="flex flex-wrap gap-2">
-          {["overview", "timeline", "nations", "geopolitics", "wiki", "survival"].map((tab) => (
-            <button
-              key={tab}
-              onClick={() => setActiveTab(tab)}
-              className={`px-4 py-1.5 rounded-full text-xs font-mono tracking-widest uppercase border transition-all ${
-                activeTab === tab
-                  ? "bg-white/20 border-white/40 text-white shadow-lg"
-                  : "border-transparent text-gray-400 hover:bg-white/5 hover:text-white"
-              }`}
-            >
-              {tab}
-            </button>
-          ))}
-        </div>
-      </header>
-
-      {/* News Ticker */}
-      <div className="glass-panel mx-4 mb-4 border-b border-white/5 py-2 px-6 flex items-center gap-4 overflow-hidden relative h-10 !rounded-full">
-        <div className="flex items-center gap-2 text-xs font-mono text-[#00f2fe] border-r border-white/20 pr-4 shrink-0 z-10">
-          <Radio className="w-3.5 h-3.5 animate-pulse" />
-          <span>PARADOX NEWS LINK</span>
-        </div>
-        <div className="flex gap-12 whitespace-nowrap animate-[marquee_30s_linear_infinite] text-xs font-mono text-gray-400">
-          {data.news.map((item, idx) => (
-            <span key={idx} className="flex items-center gap-2">
-              <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-ping" />
-              <strong className="text-white">{item.source}:</strong> {item.tickerText}
-            </span>
-          ))}
-        </div>
       </div>
+    );
+  }
 
-      {/* Main Content Area */}
-      <main className="flex-1 p-6 max-w-7xl mx-auto w-full">
-        <AnimatePresence mode="wait">
-          {activeTab === "overview" && (
-            <motion.div
-              key="overview"
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -10 }}
-              className="grid grid-cols-1 lg:grid-cols-3 gap-6"
-            >
-              {/* Scenario Profile */}
-              <div className="lg:col-span-2 space-y-6">
-                <div className="glass-panel p-8 rounded-3xl relative overflow-hidden">
-                  <div className="absolute top-0 right-0 w-64 h-64 bg-[#6a11cb] opacity-20 rounded-full blur-3xl" />
-                  <h2 className="text-2xl font-semibold tracking-wide mb-4">Simulation Synthesis</h2>
-                  <p className="text-gray-400 leading-relaxed font-light text-lg mb-6">{data.description}</p>
-                  
-                  {/* Quick Parameters */}
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 border-t border-white/15 pt-6 font-mono">
-                    <div>
-                      <span className="block text-xs text-gray-300 mb-1">GLOBAL STABILITY</span>
-                      <span className="text-xl font-bold text-white">{data.stats.globalStability}%</span>
-                    </div>
-                    <div>
-                      <span className="block text-xs text-gray-500 mb-1">TECH ADVANCEMENT</span>
-                      <span className="text-xl font-bold text-violet-400">{data.stats.techProgress}%</span>
-                    </div>
-                    <div>
-                      <span className="block text-xs text-gray-500 mb-1">SURVIVAL INDEX</span>
-                      <span className="text-xl font-bold text-emerald-400">{data.survivalOdds.survivalChance}%</span>
-                    </div>
-                    <div>
-                      <span className="block text-xs text-gray-500 mb-1">RISK LEVEL</span>
-                      <span className="text-xl font-bold text-red-400">{data.survivalOdds.dangerLevel}</span>
-                    </div>
-                  </div>
-                </div>
+  if (!data) return null;
 
-                {/* Documentary Narrator Preview */}
-                <div className="glass-panel p-6 rounded-3xl grid grid-cols-1 md:grid-cols-3 gap-6">
-                  <div className="md:col-span-2 space-y-4">
-                    <div className="flex items-center gap-3 text-amber-500">
-                      <Film className="w-5 h-5" />
-                      <span className="font-mono text-sm tracking-wider">DOCUMENTARY ARCHIVE NARRATIVE</span>
-                    </div>
-                    <blockquote className="italic text-gray-300 font-light leading-relaxed">
-                      "{data.documentary.narratorSpeech}"
-                    </blockquote>
-                    <p className="text-xs text-gray-500 font-mono">Visual: {data.documentary.sceneDescription}</p>
-                  </div>
-                  {data.documentary.imagePrompt && (
-                    <div className="relative rounded-lg overflow-hidden border border-white/10 aspect-video md:aspect-square">
-                      <img 
-                        src={`/api/image?prompt=${encodeURIComponent(data.documentary.imagePrompt)}&seed=${encodeURIComponent(params.id)}`} 
-                        alt="Simulated Archive Visualization"
-                        className="object-cover w-full h-full hover:scale-105 transition-transform duration-700"
-                        loading="lazy"
-                      />
-                      <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent pointer-events-none" />
-                    </div>
-                  )}
-                </div>
+  const act2Prompt = `Cinematic, high-contrast medium shot of an alternate 2026 city square, brutalist architecture blending with retro-futuristic analog technology, oversized monochromatic propaganda billboards, overcast dark sky, ${scenarioQuery}`;
+  const act3Prompt = `Stark, high-contrast black and white archival document photograph. blueprint of an analog, steam-powered computing engine from the 19th century, intricate technical schematics, historical museum archive aesthetic, ${data.title}`;
+
+  return (
+    <div className="w-full relative bg-[#070708] text-white selection:bg-[#ccff00] selection:text-black">
+      
+      {/* 1. Hero Condense Animation */}
+      <HeroCondense data={data} act2Prompt={act2Prompt} vectorId={params.id.substring(0,6).toUpperCase()} />
+
+      {/* 2. Horizontal Testimonial-Style Timeline */}
+      <HorizontalTimeline data={data} scenarioQuery={scenarioQuery} />
+
+      {/* 3. The Stark Contrast Wipe (Archival Data) */}
+      <section className="relative w-full bg-[#F5F5F7] text-[#070708] z-30 shadow-[0_-20px_50px_rgba(0,0,0,0.5)] border-t-[20px] border-black">
+        <div className="max-w-7xl mx-auto px-6 md:px-12 py-32 grid grid-cols-1 md:grid-cols-2 gap-12 md:gap-24">
+          
+          <div className="sticky top-32 h-[70vh] border border-[#1F2024] p-4 bg-white hidden md:block">
+            <div className="w-full h-full relative overflow-hidden bg-[#e0e0e0]">
+              <DynamicImage 
+                prompt={act3Prompt} 
+                alt="Historical Artifact" 
+                seed={84}
+                index={1}
+                className="w-full h-full mix-blend-multiply opacity-90 grayscale contrast-125" 
+              />
+              <div className="absolute bottom-4 left-4 font-mono text-[10px] tracking-widest uppercase bg-white px-2 py-1 border border-black z-10">
+                ARCHIVE REF: {Math.floor(Math.random() * 9999)}
               </div>
+            </div>
+          </div>
 
-              {/* Survival Odds Profile Card */}
-              <div className="space-y-6">
-                <div className="glass-panel p-6 rounded-3xl relative">
-                  <h3 className="text-lg font-mono tracking-widest text-gradient uppercase mb-6 flex items-center gap-2">
-                    <ShieldAlert className="w-5 h-5 text-white" />
-                    SURVIVAL PROBABILITY
-                  </h3>
-                  
-                  {/* Large Radial Display */}
-                  <div className="flex flex-col items-center my-6">
-                    <div className="relative w-36 h-36 flex items-center justify-center">
-                      <svg className="w-full h-full transform -rotate-90">
-                        <circle cx="72" cy="72" r="64" stroke="rgba(255,255,255,0.1)" strokeWidth="6" fill="transparent" />
-                        <circle cx="72" cy="72" r="64" stroke="#ff0844" strokeWidth="8" fill="transparent"
-                          strokeDasharray={402}
-                          strokeDashoffset={402 - (402 * data.survivalOdds.survivalChance) / 100}
-                          className="transition-all duration-1000"
-                        />
-                      </svg>
-                      <div className="absolute flex flex-col items-center">
-                        <span className="text-4xl font-bold font-mono tracking-tighter">{data.survivalOdds.survivalChance}%</span>
-                        <span className="text-[10px] text-gray-500 tracking-wider">INDEX</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="space-y-4 font-mono text-sm border-t border-white/10 pt-6">
-                    <div className="flex justify-between">
-                      <span className="text-gray-500">ASSIGNED STATUS:</span>
-                      <span className="text-white font-semibold">{data.survivalOdds.socialStatus}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-500">LIKELY PROFESSION:</span>
-                      <span className="text-white font-semibold">{data.survivalOdds.likelyProfession}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-500">DANGER ZONE THREAT:</span>
-                      <span className="text-red-400 font-semibold">{data.survivalOdds.dangerLevel}</span>
-                    </div>
-                    <div className="bg-white/10 backdrop-blur-md p-4 rounded-xl text-xs leading-relaxed text-white mt-2 border border-white/20">
-                      <span className="font-bold text-[#00f2fe] block mb-1">ARCHIVIST RECOMMENDATION:</span>
-                      {data.survivalOdds.tip}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </motion.div>
-          )}
-
-          {activeTab === "timeline" && (
-            <motion.div
-              key="timeline"
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -10 }}
-              className="max-w-4xl mx-auto py-8"
-            >
-              <h2 className="text-2xl font-semibold mb-8 text-center tracking-wider uppercase text-white">Altered Chronicle</h2>
+          <div className="flex flex-col gap-16 py-12">
+            <div>
+              <h3 className="text-4xl font-display font-black uppercase tracking-tighter mb-8 border-b-2 border-black pb-4">
+                Cultural Divergence
+              </h3>
+              <p className="text-xl font-display font-medium leading-relaxed mb-8">
+                {data.wikipedia?.intro || "Historical records indicate a rapid shift in cultural norms following the divergence."}
+              </p>
               
-              <div className="relative border-l-2 border-white/20 pl-8 space-y-12">
-                {data.timeline.map((event, idx) => (
-                  <motion.div
-                    key={idx}
-                    initial={{ opacity: 0, x: -20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ delay: idx * 0.15 }}
-                    className="relative"
-                  >
-                    {/* Glowing Node */}
-                    <div className="absolute -left-[41px] top-1.5 w-6 h-6 rounded-full bg-[#1a1a2e] border-2 border-[#00f2fe] flex items-center justify-center glow-primary">
-                      <div className="w-2 h-2 rounded-full bg-white" />
+              <ul className="flex flex-col gap-6">
+                {data.wikipedia?.sections?.map((sec: any, idx: number) => (
+                  <li key={idx} className="flex gap-4">
+                    <span className="font-mono text-xs mt-1">0{idx+1}</span>
+                    <div>
+                      <strong className="block font-mono text-sm uppercase tracking-widest mb-1">{sec.heading}</strong>
+                      <span className="font-display text-black/70">{sec.content}</span>
                     </div>
+                  </li>
+                ))}
+              </ul>
+            </div>
 
-                    <div className="glass-panel p-6 rounded-2xl relative hover:-translate-y-1 transition-transform">
-                      <div className="flex justify-between items-start mb-2">
-                        <span className="text-sm font-mono text-[#00f2fe] font-semibold tracking-wider">
-                          {event.year}
-                        </span>
-                        <span className="text-[10px] font-mono tracking-widest uppercase bg-white/5 px-2 py-0.5 rounded text-gray-400">
-                          {event.category}
-                        </span>
-                      </div>
-                      <h3 className="text-lg font-bold mb-3">{event.title}</h3>
-                      <p className="text-gray-400 text-sm font-light leading-relaxed">{event.description}</p>
-                      
-                      <div className="mt-4 flex items-center gap-2">
-                        <div className="flex-1 bg-white/10 h-1.5 rounded-full overflow-hidden">
-                          <div 
-                            className="bg-gradient-to-r from-[#2575fc] to-[#00f2fe] h-full" 
-                            style={{ width: `${event.impactScore}%` }} 
-                          />
-                        </div>
-                        <span className="text-[10px] font-mono text-gray-500">IMPACT: {event.impactScore}</span>
-                      </div>
-                    </div>
-                  </motion.div>
+            <div>
+              <h3 className="text-2xl font-display font-bold uppercase tracking-tight mb-6">
+                Civilization Metrics
+              </h3>
+              <div className="w-full border-t border-black">
+                {data.civilizations?.map((civ: any, idx: number) => (
+                  <div key={idx} className="border-b border-black py-4 grid grid-cols-2 gap-4">
+                    <div className="font-mono text-xs uppercase tracking-widest font-bold">{civ.name}</div>
+                    <div className="font-mono text-xs text-black/60 text-right">{civ.population} | {civ.militaryRanking}</div>
+                  </div>
                 ))}
               </div>
-            </motion.div>
-          )}
+            </div>
+            
+            <div className="bg-[#070708] text-white p-8 mt-8">
+              <div className="font-mono text-[10px] uppercase tracking-widest text-white/50 mb-4">Survival Assessment</div>
+              <div className="text-2xl font-display font-bold mb-2">Danger Level: {data.survivalOdds?.dangerLevel}</div>
+              <p className="font-mono text-xs text-white/70">{data.survivalOdds?.tip}</p>
+            </div>
+          </div>
 
-          {activeTab === "nations" && (
-            <motion.div
-              key="nations"
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -10 }}
-              className="grid grid-cols-1 md:grid-cols-2 gap-6"
-            >
-              {data.civilizations.map((civ, idx) => (
-                <div key={idx} className="glass-panel rounded-2xl relative overflow-hidden border-t-2 border-violet-500 flex flex-col justify-between">
-                  <div>
-                    {civ.imagePrompt && (
-                      <div className="h-48 relative overflow-hidden border-b border-white/10">
-                        <img 
-                          src={`/api/image?prompt=${encodeURIComponent(civ.imagePrompt)}&seed=${encodeURIComponent(params.id)}`} 
-                          alt={civ.name}
-                          className="object-cover w-full h-full hover:scale-105 transition-transform duration-700"
-                          loading="lazy"
-                        />
-                        <div className="absolute inset-0 bg-gradient-to-t from-obsidian via-transparent to-transparent" />
-                      </div>
-                    )}
-                    
-                    <div className="p-6">
-                      <div className="flex justify-between items-start mb-6">
-                        <div>
-                          <h3 className="text-xl font-bold tracking-wider text-white mb-1">{civ.name}</h3>
-                          <p className="text-xs font-mono text-violet-400 italic">"{civ.slogan}"</p>
-                        </div>
-                        <span className="font-mono text-xs uppercase bg-white/5 px-2.5 py-1 rounded border border-white/10">
-                          {civ.militaryRanking}
-                        </span>
-                      </div>
+        </div>
+      </section>
 
-                      <div className="grid grid-cols-2 gap-4 font-mono text-xs text-gray-400 mb-6 border-b border-white/5 pb-6">
-                        <div>
-                          <span className="block text-gray-500 mb-0.5">CAPITAL:</span>
-                          <span className="text-white font-semibold flex items-center gap-1">
-                            <MapPin className="w-3.5 h-3.5 text-violet-400" />
-                            {civ.capital}
-                          </span>
-                        </div>
-                        <div>
-                          <span className="block text-gray-500 mb-0.5">GOVERNMENT:</span>
-                          <span className="text-white font-semibold">{civ.government}</span>
-                        </div>
-                        <div>
-                          <span className="block text-gray-500 mb-0.5">CURRENCY:</span>
-                          <span className="text-white font-semibold">{civ.currency}</span>
-                        </div>
-                        <div>
-                          <span className="block text-gray-500 mb-0.5">POPULATION:</span>
-                          <span className="text-white font-semibold flex items-center gap-1">
-                            <Users className="w-3.5 h-3.5 text-violet-400" />
-                            {civ.population}
-                          </span>
-                        </div>
-                      </div>
+      {/* 4. Return to the Void (Epilogue) */}
+      <section className="relative w-full min-h-[80vh] bg-[#070708] text-white flex flex-col items-center justify-center p-6 text-center z-40">
+        <div className="max-w-4xl mx-auto flex flex-col items-center">
+          <div className="font-mono text-xs uppercase tracking-widest text-white/30 mb-8">
+            END OF RECORD
+          </div>
+          <h2 className="text-[8vw] md:text-[5vw] font-display font-black leading-[0.9] tracking-tighter uppercase mb-12">
+            The timeline has been documented.
+          </h2>
+          
+          <Link 
+            href="/"
+            className="group flex items-center gap-4 px-12 py-6 bg-white text-black font-display font-black uppercase tracking-widest text-xl hover:bg-[#ccff00] hover:scale-105 transition-all rounded-sm"
+          >
+            [ RE-WRITE TIMELINE ] <ArrowLeft className="w-6 h-6 group-hover:-translate-x-2 transition-transform" />
+          </Link>
+        </div>
+      </section>
 
-                      <div className="space-y-3 font-mono text-xs">
-                        <div>
-                          <span className="block text-gray-500 mb-1">ARCHITECTURAL HERITAGE:</span>
-                          <p className="text-white bg-white/5 p-3 rounded-lg border border-white/5 font-light leading-relaxed">
-                            {civ.architectureStyle}
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </motion.div>
-          )}
-
-          {activeTab === "geopolitics" && (
-            <motion.div
-              key="geopolitics"
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -10 }}
-              className="grid grid-cols-1 lg:grid-cols-3 gap-6"
-            >
-              {/* SVG Holographic World Map */}
-              <div className="lg:col-span-2 glass-panel p-6 rounded-2xl flex flex-col">
-                <div className="flex justify-between items-center mb-6">
-                  <h3 className="text-lg font-mono tracking-widest text-[var(--color-electric-cyan)] uppercase flex items-center gap-2">
-                    <Globe className="w-5 h-5" />
-                    TACTICAL CONFLICT OVERLAY
-                  </h3>
-                  <span className="text-[10px] font-mono text-gray-500 bg-white/5 px-2 py-0.5 rounded">
-                    MATRIX_VERSION_1.0
-                  </span>
-                </div>
-
-                <div className="relative flex-1 min-h-[350px] bg-matte-black/50 border border-white/5 rounded-xl flex items-center justify-center p-4">
-                  {/* Tech Grid SVG Map */}
-                  <svg viewBox="0 0 800 400" className="w-full h-full opacity-80">
-                    <defs>
-                      <pattern id="grid" width="20" height="20" patternUnits="userSpaceOnUse">
-                        <path d="M 20 0 L 0 0 0 20" fill="none" stroke="rgba(255, 255, 255, 0.03)" strokeWidth="1" />
-                      </pattern>
-                    </defs>
-                    <rect width="100%" height="100%" fill="url(#grid)" />
-                    
-                    {/* Simulated Continent Paths */}
-                    <path d="M 150 100 Q 200 80 250 120 T 350 110 T 300 200 T 200 250 T 100 220 Z" fill="rgba(0, 240, 255, 0.08)" stroke="var(--color-electric-cyan)" strokeWidth="1" />
-                    <path d="M 500 120 Q 550 90 600 130 T 700 150 T 650 250 T 550 280 T 450 220 Z" fill="rgba(138, 43, 226, 0.08)" stroke="#8a2be2" strokeWidth="1" />
-                    <path d="M 380 280 Q 420 260 480 290 T 500 350 T 440 370 T 360 340 Z" fill="rgba(255, 0, 60, 0.08)" stroke="var(--color-crimson-red)" strokeWidth="1" />
-
-                    {/* Region Marker Rings */}
-                    <circle cx="220" cy="160" r="10" fill="none" stroke="var(--color-electric-cyan)" strokeWidth="1.5" className="animate-ping" style={{ transformOrigin: "220px 160px", animationDuration: "3s" }} />
-                    <circle cx="220" cy="160" r="4" fill="var(--color-electric-cyan)" />
-
-                    <circle cx="580" cy="200" r="10" fill="none" stroke="#8a2be2" strokeWidth="1.5" className="animate-ping" style={{ transformOrigin: "580px 200px", animationDuration: "4s" }} />
-                    <circle cx="580" cy="200" r="4" fill="#8a2be2" />
-
-                    {/* Scanning Line overlay */}
-                    <line x1="0" y1="50" x2="800" y2="50" stroke="var(--color-electric-cyan)" strokeWidth="0.5" opacity="0.4" className="animate-[bounce_8s_infinite]" />
-                  </svg>
-                  
-                  <div className="absolute bottom-4 left-4 font-mono text-[10px] text-gray-500 space-y-1">
-                    <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-[var(--color-electric-cyan)]" /> The New Coalition Zone</span>
-                    <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-violet-500" /> The Meridian Alliance Zone</span>
-                    <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-red-500" /> Disputed / Tension Zone</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Region tension index list */}
-              <div className="glass-panel p-6 rounded-2xl flex flex-col justify-between">
-                <div>
-                  <h3 className="text-lg font-mono tracking-widest text-white uppercase mb-6">
-                    REGION INDEX
-                  </h3>
-                  <div className="space-y-4">
-                    {data.mapRegions.map((region, idx) => (
-                      <div key={idx} className="bg-white/5 p-4 rounded-xl border border-white/5 space-y-2">
-                        <div className="flex justify-between items-center">
-                          <span className="font-mono text-sm font-semibold">{region.name}</span>
-                          <span className={`text-[10px] font-mono px-2 py-0.5 rounded ${
-                            region.tensionLevel > 50 ? "bg-red-500/10 text-red-400 border border-red-500/20" : "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
-                          }`}>
-                            {region.status}
-                          </span>
-                        </div>
-                        <div className="flex justify-between font-mono text-[10px] text-gray-500">
-                          <span>CONTROL: {region.controllingFaction}</span>
-                          <span>TENSION: {region.tensionLevel}%</span>
-                        </div>
-                        <div className="w-full bg-white/5 h-1 rounded-full overflow-hidden">
-                          <div 
-                            className={`h-full ${region.tensionLevel > 50 ? "bg-red-500" : "bg-emerald-500"}`} 
-                            style={{ width: `${region.tensionLevel}%` }} 
-                          />
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Macro stats */}
-                <div className="border-t border-white/10 pt-6 mt-6 grid grid-cols-2 gap-4 font-mono text-center">
-                  <div>
-                    <span className="block text-[10px] text-gray-500 mb-1">STABILITY RATIO</span>
-                    <span className="text-lg font-bold text-emerald-400">92.4%</span>
-                  </div>
-                  <div>
-                    <span className="block text-[10px] text-gray-500 mb-1">TACTICAL TENSION</span>
-                    <span className="text-lg font-bold text-red-400">Low-Mod</span>
-                  </div>
-                </div>
-              </div>
-            </motion.div>
-          )}
-
-          {activeTab === "wiki" && (
-            <motion.div
-              key="wiki"
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -10 }}
-              className="max-w-4xl mx-auto glass-panel p-8 md:p-12 rounded-3xl"
-            >
-              <div className="flex flex-col md:flex-row gap-8 items-start">
-                {/* Wiki Article */}
-                <div className="flex-1 space-y-6">
-                  <div className="border-b border-white/10 pb-4 mb-6">
-                    <div className="flex items-center gap-2 text-xs font-mono text-gray-500 mb-2">
-                      <BookOpen className="w-3.5 h-3.5" />
-                      <span>ALTERNATE WIKIPEDIA LOG ARCHIVE</span>
-                    </div>
-                    <h2 className="text-3xl font-bold tracking-tight">{data.wikipedia.title}</h2>
-                  </div>
-                  
-                  <p className="text-gray-300 leading-relaxed font-light text-base md:text-lg">
-                    {data.wikipedia.intro}
-                  </p>
-
-                  <div className="space-y-8 pt-4">
-                    {data.wikipedia.sections.map((section, idx) => (
-                      <div key={idx} className="space-y-3">
-                        <h3 className="text-xl font-bold tracking-wide border-b border-white/5 pb-2 text-[var(--color-electric-cyan)]">
-                          {section.heading}
-                        </h3>
-                        <p className="text-gray-400 leading-relaxed font-light text-sm md:text-base">
-                          {section.content}
-                        </p>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Fictional Infobox */}
-                <div className="w-full md:w-72 bg-white/5 border border-white/10 rounded-xl p-4 shrink-0 font-mono text-xs">
-                  <div className="bg-white/10 p-2 text-center font-bold mb-4 rounded border border-white/5 uppercase tracking-wider text-[var(--color-electric-cyan)]">
-                    Timeline Parameters
-                  </div>
-                  <table className="w-full text-left space-y-2">
-                    <tbody>
-                      {data.wikipedia.infobox.map((info, idx) => (
-                        <tr key={idx} className="border-b border-white/5 last:border-0">
-                          <td className="py-2.5 text-gray-500 font-medium pr-4 uppercase">{info.label}</td>
-                          <td className="py-2.5 text-white font-semibold text-right">{info.value}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            </motion.div>
-          )}
-
-          {activeTab === "survival" && (
-            <motion.div
-              key="survival"
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -10 }}
-              className="grid grid-cols-1 md:grid-cols-2 gap-6"
-            >
-              {/* Propaganda Poster Generator */}
-              {data.propaganda.map((poster, idx) => (
-                <div key={idx} className="glass-panel rounded-2xl border-t border-white/10 flex flex-col justify-between overflow-hidden relative">
-                  <div className="absolute inset-0 noise-bg opacity-10 pointer-events-none" />
-                  
-                  {poster.imagePrompt && (
-                    <div className="h-64 relative overflow-hidden border-b border-white/10">
-                      <img 
-                        src={`/api/image?prompt=${encodeURIComponent(poster.imagePrompt)}&seed=${encodeURIComponent(params.id)}`} 
-                        alt={poster.title}
-                        className="object-cover w-full h-full hover:scale-105 transition-transform duration-700"
-                        loading="lazy"
-                      />
-                      <div className="absolute inset-0 bg-gradient-to-t from-obsidian via-transparent to-transparent" />
-                    </div>
-                  )}
-
-                  <div className="p-8 space-y-6 flex-1 flex flex-col justify-between">
-                    <div className="space-y-4">
-                      <div className="flex justify-between items-center">
-                        <span className="font-mono text-xs tracking-widest text-[var(--color-electric-cyan)] uppercase flex items-center gap-1.5">
-                          <ImageIcon className="w-4 h-4" />
-                          PROPAGANDA ARCHIVE
-                        </span>
-                        <span className="font-mono text-[10px] text-gray-500 uppercase">{poster.faction}</span>
-                      </div>
-                      
-                      <h3 className="text-2xl font-bold tracking-tight text-white">{poster.title}</h3>
-                      <p className="text-gray-400 text-sm font-light leading-relaxed">{poster.visualDescription}</p>
-                    </div>
-
-                    <div className="bg-red-500/5 border border-red-500/20 p-6 rounded-xl flex flex-col items-center text-center space-y-2 mt-4">
-                      <span className="font-mono text-[10px] text-red-500 tracking-[0.2em] uppercase font-bold">Official Directive Slogan</span>
-                      <p className="text-lg md:text-xl font-bold tracking-tight text-red-400 uppercase italic">
-                        "{poster.slogan}"
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </main>
     </div>
   );
 }
