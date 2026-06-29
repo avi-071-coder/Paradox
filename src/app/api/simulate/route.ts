@@ -32,7 +32,7 @@ export async function POST(request: Request) {
         "timeline": Array<{
           "year": string,
           "title": string,
-          "description": string, // 3-4 vivid, detailed sentences about this event. Describe what happened, who was affected, what changed permanently, and the emotional/human impact.
+          "description": string, // A vivid description of this event, exactly 3 sentences (aim for 50-65 words, which is 6-8 lines of text). Do not exceed 3 sentences.
           "category": "conflict" | "invention" | "politics" | "culture" | "society",
           "impactScore": number // 1-100
         }>,
@@ -84,7 +84,7 @@ export async function POST(request: Request) {
           "title": string,
           "infobox": Array<{ label: string, value: string }>,
           "intro": string, // 3-4 sentences, written like a real Wikipedia article intro. Dense with facts, dates, and context.
-          "sections": Array<{ heading: string, content: string }> // IMPORTANT: Each section content MUST be 4-5 detailed sentences. Write like a real encyclopedia. Include specific dates, names, consequences, and historical analysis. This is the most important text in the entire response — make it thorough and substantive.
+          "sections": Array<{ heading: string, content: string }> // IMPORTANT: Each section content MUST be exactly 2 sentences (aim for 30-40 words, which is 3-5 lines of text). Do not exceed 2 sentences.
         },
         "propaganda": Array<{
           "title": string,
@@ -98,7 +98,7 @@ export async function POST(request: Request) {
       CRITICAL RULES:
       1. Escape internal double quotes properly.
       2. No trailing commas.
-      3. Write RICH, DETAILED text. Every description field must have multiple full sentences. One-liners or single phrases are UNACCEPTABLE. The wikipedia sections especially must be long and detailed (4-5 sentences each).
+      3. Every description field must have multiple full sentences. One-liners or single phrases are UNACCEPTABLE. The wikipedia sections must be exactly 2 sentences (3-5 lines). The timeline descriptions must be exactly 3 sentences (6-8 lines).
       4. Array sizes: "timeline" = exactly 4 items, "civilizations" = exactly 2, "news" = exactly 3, "mapRegions" = exactly 3, "propaganda" = exactly 2, "wikipedia.sections" = exactly 2, "wikipedia.infobox" = exactly 4, "gdpDistribution" = exactly 3, "militaryIndex" = exactly 3.
       5. Return ONLY the raw JSON. No markdown, no commentary, no introductory text.
     `;
@@ -116,11 +116,10 @@ export async function POST(request: Request) {
       try {
         console.log(`[SIMULATION_ENGINE] Stage 1: Attempting direct Google Gemini generation...`);
         const response = await ai.models.generateContent({
-          model: "gemini-flash-latest",
+          model: "gemini-2.5-flash",
           contents: prompt,
           config: {
             responseMimeType: "application/json",
-            maxOutputTokens: 8192,
           }
         });
 
@@ -140,17 +139,16 @@ export async function POST(request: Request) {
     // Stage 2: OpenRouter fallback
     if (!success && openrouterApiKey) {
       const modelsToTry = [
-        "openrouter/free",
-        "google/gemma-2-9b-it:free",
+        "google/gemini-2.5-flash:free",
         "meta-llama/llama-3.3-70b-instruct:free"
       ];
       for (const modelName of modelsToTry) {
         try {
           console.log(`[SIMULATION_ENGINE] Stage 2: Attempting OpenRouter model ${modelName}...`);
           
-          // Generous 60-second timeout per model to ensure we get the full response
+          // Shorter 12-second timeout per model to keep responsiveness high
           const controller = new AbortController();
-          const timeoutId = setTimeout(() => controller.abort(), 60000);
+          const timeoutId = setTimeout(() => controller.abort(), 12000);
           
           const orResponse = await fetch("https://openrouter.ai/api/v1/chat/completions", {
             method: "POST",
@@ -173,7 +171,7 @@ export async function POST(request: Request) {
                 }
               ],
               response_format: { type: "json_object" },
-              max_tokens: 6000
+              max_tokens: 3000
             }),
             signal: controller.signal
           });
@@ -197,7 +195,7 @@ export async function POST(request: Request) {
             console.error(`[SIMULATION_ENGINE] OpenRouter model ${modelName} returned error status ${orResponse.status}:`, errText);
           }
         } catch (err: any) {
-          console.error(`[SIMULATION_ENGINE] Stage 2 (OpenRouter model ${modelName}) threw error:`, err.name === "AbortError" ? `Request timed out (60s)` : err);
+          console.error(`[SIMULATION_ENGINE] Stage 2 (OpenRouter model ${modelName}) threw error:`, err.name === "AbortError" ? `Request timed out (12s)` : err);
         }
       }
     }
@@ -381,28 +379,28 @@ function getFallbackData(scenario: string) {
       {
         year: "1 Year Post-Divergence",
         title: "The Initial Fracture",
-        description: `Following the event where ${scenario}, the primary geopolitical power structures experience a rapid shift. Former allies declare neutrality as the new order stabilizes around this paradigm shift.`,
+        description: `Following the event where ${scenario}, the primary geopolitical power structures experience a rapid shift. Former allies declare neutrality as the new order stabilizes around this paradigm shift. The immediate economic impact triggers widespread rationing and currency control measures across the hemisphere.`,
         category: "politics",
         impactScore: 85
       },
       {
         year: "10 Years Post-Divergence",
         title: "Technological Adaptation",
-        description: `Global focus redirects toward alternative systems to sustain a world where ${scenario}. Specialized engineering and social systems are rapidly deployed.`,
+        description: `Global focus redirects toward alternative systems to sustain a world where ${scenario}. Specialized engineering and social systems are rapidly deployed to bypass old dependencies. These adaptations lay the groundwork for the emerging regional technocratic federations.`,
         category: "invention",
         impactScore: 90
       },
       {
         year: "25 Years Post-Divergence",
         title: "The Great Realignment",
-        description: `New power blocs finalize continental alliances. Ancient territories are reclaimed under modern banners, fully adapting to the reality that ${scenario}.`,
+        description: `New power blocs finalize continental alliances. Ancient territories are reclaimed under modern banners, fully adapting to the reality that ${scenario}. Border checkpoints utilize biometric tracking systems to enforce stability across boundaries.`,
         category: "society",
         impactScore: 95
       },
       {
         year: "50 Years Post-Divergence",
         title: "A Fragile New Equilibrium",
-        description: `A state of global equilibrium is established. The world is unrecognizable compared to the prime timeline, entirely shaped by the long-term consequences of ${scenario}.`,
+        description: `A state of global equilibrium is established. The world is unrecognizable compared to the prime timeline, entirely shaped by the long-term consequences of ${scenario}. While external conflicts have subsided, underlying ideological tensions continue to simmer in major urban hubs.`,
         category: "culture",
         impactScore: 78
       }
@@ -492,11 +490,11 @@ function getFallbackData(scenario: string) {
       sections: [
         {
           heading: "The Fracture",
-          content: `The initial event that led to the Divergent Epoch — the moment where ${scenario} — remains a subject of intense archival study and political debate. What started as a seemingly localized disruption to the established order quickly cascaded into a full-scale global geopolitical restructuring, as the power vacuum created by the divergence point drew in competing factions, ideological movements, and opportunistic military actors. Within the first three years, 47 sovereign nations either dissolved, merged, or underwent violent regime changes. The United Nations, unable to adapt to the new reality, formally dissolved in Year 4, replaced by the Provisional Council of Human Continuity. Economic systems based on legacy currencies collapsed within 18 months, forcing the rapid development of algorithmic resource allocation frameworks that would eventually become the Quantum Credit system.`
+          content: `The initial event that led to the Divergent Epoch — the moment where ${scenario} — remains a subject of intense archival study and political debate. What started as a localized timeline fluctuation quickly cascaded into global geopolitical restructuring as traditional nation-states struggled to adapt.`
         },
         {
           heading: "Establishment of the Technocracy",
-          content: `By Year 15, traditional governmental models across the former G20 nations were largely replaced by technocratic assemblies that prioritized algorithmic resource distribution, ecological preservation, and population stability over democratic representation. The transition was neither peaceful nor universally accepted — the Resistance Campaigns of Years 8 through 12 saw an estimated 2.3 million casualties across the Eurasian Core alone. However, the demonstrable efficiency of technocratic governance in managing the cascading resource crises of the early Epoch gradually eroded public support for legacy democratic institutions. The New Coalition formalized its constitution in Year 16, establishing the Council of Architects as the supreme governing body, while the Meridian Alliance adopted a more decentralized model based on bioregional autonomy and ecological stewardship.`
+          content: `By Year 15, traditional governmental models were largely replaced by technocratic assemblies focused on algorithmic resource distribution and ecological preservation. The transition saw significant regional resistance but eventually stabilized under the two primary global factions.`
         }
       ]
     },

@@ -190,16 +190,16 @@ function HeroCondense({ data, act2Prompt, vectorId }: { data: any, act2Prompt: s
       </div>
 
       {/* Floating HUD elements (Fixed at top, stays above all sections) */}
-      <div className="fixed top-0 w-full p-6 md:p-8 z-50 flex justify-between pointer-events-none">
+      <div className="fixed top-0 w-full p-4 md:p-8 z-50 flex justify-between gap-4 pointer-events-none">
         <Link 
           href="/" 
-          className="pointer-events-auto flex items-center gap-2 px-4 py-2.5 border border-white/10 bg-[#070708]/80 backdrop-blur-md text-white hover:bg-white hover:text-black hover:border-white transition-all font-mono text-xs uppercase tracking-widest rounded-none shadow-[0_8px_32px_rgba(0,0,0,0.5)]"
+          className="pointer-events-auto flex items-center gap-2 px-3 py-2 md:px-4 md:py-2.5 border border-white/10 bg-[#070708]/80 backdrop-blur-md text-white hover:bg-white hover:text-black hover:border-white transition-all font-mono text-[10px] md:text-xs uppercase tracking-widest rounded-none shadow-[0_8px_32px_rgba(0,0,0,0.5)]"
         >
-          <ArrowLeft className="w-4 h-4" /> <span>Return</span>
+          <ArrowLeft className="w-3.5 h-3.5" /> <span>Return</span>
         </Link>
-        <div className="pointer-events-auto text-right px-4 py-2 border border-white/10 bg-[#070708]/80 backdrop-blur-md rounded-none shadow-[0_8px_32px_rgba(0,0,0,0.5)]">
-          <div className="font-mono text-[9px] uppercase tracking-widest text-white/40 mb-0.5">[SYS_LOG: SIMULATING...]</div>
-          <div className="font-mono text-xs uppercase tracking-widest text-[#ccff00] font-bold">STABILITY: {data.stats?.globalStability || 78}%</div>
+        <div className="pointer-events-auto text-right px-3 py-1.5 md:px-4 md:py-2 border border-white/10 bg-[#070708]/80 backdrop-blur-md rounded-none shadow-[0_8px_32px_rgba(0,0,0,0.5)]">
+          <div className="font-mono text-[8px] md:text-[9px] uppercase tracking-widest text-white/40 mb-0.5">[SYS_LOG: SIMULATING...]</div>
+          <div className="font-mono text-[10px] md:text-xs uppercase tracking-widest text-[#ccff00] font-bold">STABILITY: {data.stats?.globalStability || 78}%</div>
         </div>
       </div>
     </section>
@@ -249,7 +249,7 @@ function HorizontalTimeline({ data, scenarioQuery }: { data: any, scenarioQuery:
             return (
               <div 
                 key={idx} 
-                className="w-[85vw] md:w-[45vw] h-[70vh] flex-shrink-0 relative border border-white/10 bg-gradient-to-br from-white/[0.03] to-white/[0.01] backdrop-blur-md overflow-hidden p-8 md:p-12 flex flex-col"
+                className="w-[85vw] md:w-[45vw] h-[55vh] md:h-[70vh] flex-shrink-0 relative border border-white/10 bg-gradient-to-br from-white/[0.03] to-white/[0.01] backdrop-blur-md overflow-hidden p-6 md:p-12 flex flex-col"
               >
                 {/* Tactical Dot Matrix Background */}
                 <div 
@@ -268,23 +268,23 @@ function HorizontalTimeline({ data, scenarioQuery }: { data: any, scenarioQuery:
 
                 {/* Card Content — scrollable area */}
                 <div className="flex flex-col justify-start relative z-10 flex-1 min-h-0 overflow-y-auto pr-2" style={{ scrollbarWidth: 'thin', scrollbarColor: '#ccff00 transparent' }}>
-                  <div className="font-mono text-xs uppercase tracking-widest text-[#ccff00] mb-6 flex items-center justify-between flex-shrink-0">
+                  <div className="font-mono text-[10px] uppercase tracking-widest text-[#ccff00] mb-4 md:mb-6 flex items-center justify-between flex-shrink-0">
                     <span>{event.year} // {event.category}</span>
                     <span className="text-white/20 text-[9px]">[ IDX: 0{idx + 1} ]</span>
                   </div>
-                  <h3 className="text-3xl md:text-5xl font-display font-black uppercase tracking-tight mb-6 text-white leading-tight flex-shrink-0">
+                  <h3 className="text-xl md:text-4xl font-display font-black uppercase tracking-tight mb-4 md:mb-6 text-white leading-tight flex-shrink-0">
                     {event.title}
                   </h3>
-                  <p className="text-sm md:text-base text-white/70 font-mono leading-relaxed">
+                  <p className="text-xs md:text-base text-white/70 font-mono leading-relaxed">
                     {event.description}
                   </p>
                 </div>
 
                 {/* HUD Card Content Bottom - Impact Metric */}
-                <div className="relative z-10 pt-6 mt-auto border-t border-white/5 flex items-center justify-between font-mono text-[9px] md:text-[10px] uppercase tracking-widest text-white/40 flex-shrink-0">
+                <div className="relative z-10 pt-4 md:pt-6 mt-auto border-t border-white/5 flex items-center justify-between font-mono text-[9px] md:text-[10px] uppercase tracking-widest text-white/40 flex-shrink-0">
                   <span>DIVERGENCE IMPACT</span>
                   <div className="flex items-center gap-3">
-                    <div className="w-20 md:w-28 h-1 bg-white/10 rounded-full overflow-hidden">
+                    <div className="w-16 md:w-28 h-1 bg-white/10 rounded-full overflow-hidden">
                       <div 
                         className="h-full bg-[#ccff00] rounded-full shadow-[0_0_8px_#ccff00]" 
                         style={{ width: `${event.impactScore || 50}%` }}
@@ -410,9 +410,9 @@ export default function TimelineScrollytelling(props: PageProps) {
 
       {/* 3. The Stark Contrast Wipe (Archival Data) */}
       <section className="relative w-full bg-[#F5F5F7] text-[#070708] z-30 shadow-[0_-20px_50px_rgba(0,0,0,0.5)] border-t-[20px] border-black">
-        <div className="max-w-7xl mx-auto px-6 md:px-12 py-32 grid grid-cols-1 md:grid-cols-2 gap-12 md:gap-24">
+        <div className="max-w-7xl mx-auto px-6 md:px-12 py-16 md:py-32 grid grid-cols-1 md:grid-cols-2 gap-12 md:gap-24">
           
-          <div className="sticky top-32 h-[70vh] border border-[#1F2024] p-4 bg-white hidden md:block">
+          <div className="w-full h-[35vh] md:h-[70vh] border border-[#1F2024] p-3 md:p-4 bg-white md:sticky md:top-32">
             <div className="w-full h-full relative overflow-hidden bg-[#e0e0e0]">
               <DynamicImage 
                 prompt={act3Prompt} 
@@ -485,9 +485,9 @@ export default function TimelineScrollytelling(props: PageProps) {
           
           <Link 
             href="/"
-            className="group flex items-center gap-4 px-12 py-6 bg-white text-black font-display font-black uppercase tracking-widest text-xl hover:bg-[#ccff00] hover:scale-105 transition-all rounded-sm"
+            className="group flex items-center gap-4 px-8 py-4 md:px-12 md:py-6 bg-white text-black font-display font-black uppercase tracking-widest text-sm md:text-xl hover:bg-[#ccff00] hover:scale-105 transition-all rounded-sm"
           >
-            [ RE-WRITE TIMELINE ] <ArrowLeft className="w-6 h-6 group-hover:-translate-x-2 transition-transform" />
+            [ RE-WRITE TIMELINE ] <ArrowLeft className="w-5 h-5 md:w-6 md:h-6 group-hover:-translate-x-2 transition-transform" />
           </Link>
         </div>
       </section>

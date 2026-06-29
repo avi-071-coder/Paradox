@@ -1,16 +1,42 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { motion, useScroll, useTransform, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { ArrowRight, Sparkles } from "lucide-react";
+import { ScrollCanvasAnimation } from "@/components/ScrollCanvasAnimation";
+import { WebGLBackground } from "@/components/WebGLBackground";
 
 export default function EnginePortal() {
   const [scenario, setScenario] = useState("");
   const [isGenerating, setIsGenerating] = useState(false);
+  const [isIntro, setIsIntro] = useState(true);
   const router = useRouter();
   
   const inputSectionRef = useRef<HTMLDivElement>(null);
+
+  // 4-second intro sequence timer
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setIsIntro(false);
+    }, 4000);
+    return () => clearTimeout(timer);
+  }, []);
+
+  // Lock scrolling during the intro phase
+  useEffect(() => {
+    if (isIntro) {
+      document.documentElement.classList.add("lenis-stopped");
+      document.body.style.overflow = "hidden";
+    } else {
+      document.documentElement.classList.remove("lenis-stopped");
+      document.body.style.overflow = "";
+    }
+    return () => {
+      document.documentElement.classList.remove("lenis-stopped");
+      document.body.style.overflow = "";
+    };
+  }, [isIntro]);
 
   const handleSimulate = (e?: React.FormEvent | React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e) e.preventDefault();
@@ -29,8 +55,13 @@ export default function EnginePortal() {
   return (
     <main className="relative w-full bg-[#070708] text-white selection:bg-[#ccff00] selection:text-black">
       
-      {/* Top Right Navigation */}
-      <nav className="fixed top-0 w-full p-6 md:p-12 flex justify-between items-center z-50 pointer-events-none mix-blend-difference">
+      {/* Top Right Navigation - Fades in after Intro */}
+      <motion.nav 
+        initial={{ opacity: 0, y: -25 }}
+        animate={{ opacity: isIntro ? 0 : 1, y: isIntro ? -25 : 0 }}
+        transition={{ duration: 1.2, ease: [0.16, 1, 0.3, 1] }}
+        className="fixed top-0 w-full p-6 md:p-12 flex justify-between items-center z-50 pointer-events-none mix-blend-difference"
+      >
         <span className="font-display font-black text-2xl tracking-tighter uppercase text-white">PARADOX</span>
         <button 
           onClick={scrollToInput}
@@ -38,27 +69,46 @@ export default function EnginePortal() {
         >
           Express Alternate Thought
         </button>
-      </nav>
+      </motion.nav>
 
-      {/* Fixed Cinematic Video Background */}
+      {/* Fixed Background Cross-Fader */}
       <div className="fixed inset-0 w-full h-screen overflow-hidden flex items-center justify-center z-0 pointer-events-none">
-        <div className="absolute inset-0 w-full h-full flex items-center justify-center scale-125">
-          <video 
-            autoPlay 
-            loop 
-            muted 
-            playsInline
-            className="w-full h-full object-cover opacity-60"
+        <div className="absolute inset-0 w-full h-full flex items-center justify-center">
+          
+          {/* WebGL Universe Background (Intro - Active for 4 seconds) */}
+          <div 
+            className="absolute inset-0 transition-opacity duration-1000 ease-in-out"
+            style={{ 
+              opacity: isIntro ? 1 : 0,
+              visibility: isIntro ? "visible" : "hidden"
+            }}
           >
-            <source src="/INTRO.mp4" type="video/mp4" />
-          </video>
+            <WebGLBackground />
+          </div>
+
+          {/* Original Frame Sequence Background (Main - Preloaded and active after 4 seconds) */}
+          <div 
+            className="absolute inset-0 transition-opacity duration-1000 ease-in-out"
+            style={{ 
+              opacity: isIntro ? 0 : 1 
+            }}
+          >
+            <ScrollCanvasAnimation />
+          </div>
+
+          {/* Vignette and overlays */}
           <div className="absolute inset-0 bg-gradient-to-b from-[#070708]/40 via-transparent to-[#070708]" />
           <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-transparent via-transparent to-[#070708]/80" />
         </div>
       </div>
 
-      {/* SEQUENTIAL SNAP SCROLL SECTIONS */}
-      <div className="relative z-10 w-full flex flex-col">
+      {/* SEQUENTIAL SNAP SCROLL SECTIONS - Fades in after Intro */}
+      <motion.div 
+        initial={{ opacity: 0 }}
+        animate={{ opacity: isIntro ? 0 : 1 }}
+        transition={{ duration: 1.2, ease: "easeInOut" }}
+        className="relative z-10 w-full flex flex-col"
+      >
         
         <section className="h-screen w-full flex flex-col items-center justify-center snap-center px-4">
           <motion.h1 
@@ -177,7 +227,7 @@ export default function EnginePortal() {
                         }
                       }}
                       placeholder="E.g. What if the internet was never invented?"
-                      className="w-full bg-white/5 border border-white/10 p-6 text-2xl md:text-4xl text-white placeholder-white/20 focus:outline-none focus:border-[#ccff00] transition-colors resize-none min-h-[150px] font-display font-medium tracking-tight"
+                      className="w-full bg-white/5 border border-white/10 p-6 text-xl md:text-4xl text-white placeholder-white/20 focus:outline-none focus:border-[#ccff00] transition-colors resize-none min-h-[150px] font-display font-medium tracking-tight"
                     />
 
                     <div className="flex justify-between items-center mt-4 border-t border-white/10 pt-8">
@@ -187,9 +237,9 @@ export default function EnginePortal() {
                       <button 
                         type="submit"
                         disabled={!scenario.trim()}
-                        className="group flex items-center gap-4 px-8 py-4 bg-white text-black font-display font-black uppercase tracking-widest text-lg disabled:opacity-30 disabled:cursor-not-allowed hover:bg-[#ccff00] transition-colors"
+                        className="group flex items-center gap-4 px-6 py-3 md:px-8 md:py-4 bg-white text-black font-display font-black uppercase tracking-widest text-sm md:text-lg disabled:opacity-30 disabled:cursor-not-allowed hover:bg-[#ccff00] transition-colors"
                       >
-                        VISUALIZE <ArrowRight className="w-6 h-6 group-hover:translate-x-2 transition-transform" />
+                        VISUALIZE <ArrowRight className="w-5 h-5 md:w-6 md:h-6 group-hover:translate-x-2 transition-transform" />
                       </button>
                     </div>
                   </div>
@@ -198,7 +248,7 @@ export default function EnginePortal() {
             )}
           </AnimatePresence>
         </section>
-      </div>
+      </motion.div>
 
     </main>
   );
