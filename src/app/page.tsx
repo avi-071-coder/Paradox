@@ -5,38 +5,13 @@ import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { ArrowRight, Sparkles } from "lucide-react";
 import { ScrollCanvasAnimation } from "@/components/ScrollCanvasAnimation";
-import { WebGLBackground } from "@/components/WebGLBackground";
 
 export default function EnginePortal() {
   const [scenario, setScenario] = useState("");
   const [isGenerating, setIsGenerating] = useState(false);
-  const [isIntro, setIsIntro] = useState(true);
   const router = useRouter();
   
   const inputSectionRef = useRef<HTMLDivElement>(null);
-
-  // 4-second intro sequence timer
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setIsIntro(false);
-    }, 4000);
-    return () => clearTimeout(timer);
-  }, []);
-
-  // Lock scrolling during the intro phase
-  useEffect(() => {
-    if (isIntro) {
-      document.documentElement.classList.add("lenis-stopped");
-      document.body.style.overflow = "hidden";
-    } else {
-      document.documentElement.classList.remove("lenis-stopped");
-      document.body.style.overflow = "";
-    }
-    return () => {
-      document.documentElement.classList.remove("lenis-stopped");
-      document.body.style.overflow = "";
-    };
-  }, [isIntro]);
 
   const handleSimulate = (e?: React.FormEvent | React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e) e.preventDefault();
@@ -55,11 +30,8 @@ export default function EnginePortal() {
   return (
     <main className="relative w-full bg-[#070708] text-white selection:bg-[#ccff00] selection:text-black">
       
-      {/* Top Right Navigation - Fades in after Intro */}
-      <motion.nav 
-        initial={{ opacity: 0, y: -25 }}
-        animate={{ opacity: isIntro ? 0 : 1, y: isIntro ? -25 : 0 }}
-        transition={{ duration: 1.2, ease: [0.16, 1, 0.3, 1] }}
+      {/* Top Right Navigation */}
+      <nav 
         className="fixed top-0 w-full p-6 md:p-12 flex justify-between items-center z-50 pointer-events-none mix-blend-difference"
       >
         <span className="font-display font-black text-2xl tracking-tighter uppercase text-white">PARADOX</span>
@@ -69,30 +41,14 @@ export default function EnginePortal() {
         >
           Express Alternate Thought
         </button>
-      </motion.nav>
+      </nav>
 
       {/* Fixed Background Cross-Fader */}
       <div className="fixed inset-0 w-full h-screen overflow-hidden flex items-center justify-center z-0 pointer-events-none">
         <div className="absolute inset-0 w-full h-full flex items-center justify-center">
           
-          {/* WebGL Universe Background (Intro - Active for 4 seconds) */}
-          <div 
-            className="absolute inset-0 transition-opacity duration-1000 ease-in-out"
-            style={{ 
-              opacity: isIntro ? 1 : 0,
-              visibility: isIntro ? "visible" : "hidden"
-            }}
-          >
-            <WebGLBackground />
-          </div>
-
-          {/* Original Frame Sequence Background (Main - Preloaded and active after 4 seconds) */}
-          <div 
-            className="absolute inset-0 transition-opacity duration-1000 ease-in-out"
-            style={{ 
-              opacity: isIntro ? 0 : 1 
-            }}
-          >
+          {/* Original Frame Sequence Background (Main - Preloaded and active immediately) */}
+          <div className="absolute inset-0">
             <ScrollCanvasAnimation />
           </div>
 
@@ -102,15 +58,12 @@ export default function EnginePortal() {
         </div>
       </div>
 
-      {/* SEQUENTIAL SNAP SCROLL SECTIONS - Fades in after Intro */}
-      <motion.div 
-        initial={{ opacity: 0 }}
-        animate={{ opacity: isIntro ? 0 : 1 }}
-        transition={{ duration: 1.2, ease: "easeInOut" }}
+      {/* SEQUENTIAL SNAP SCROLL SECTIONS */}
+      <div 
         className="relative z-10 w-full flex flex-col"
       >
         
-        <section className="h-screen w-full flex flex-col items-center justify-center snap-center px-4">
+        <section className="h-[100dvh] w-full flex flex-col items-center justify-center snap-center px-4">
           <motion.h1 
             initial={{ opacity: 0, y: 30 }}
             whileInView={{ opacity: 1, y: 0 }}
@@ -122,7 +75,7 @@ export default function EnginePortal() {
           </motion.h1>
         </section>
 
-        <section className="h-screen w-full flex flex-col items-center justify-center snap-center px-4">
+        <section className="h-[100dvh] w-full flex flex-col items-center justify-center snap-center px-4">
           <motion.h1 
             initial={{ opacity: 0, scale: 0.9 }}
             whileInView={{ opacity: 1, scale: 1 }}
@@ -134,7 +87,7 @@ export default function EnginePortal() {
           </motion.h1>
         </section>
 
-        <section className="h-screen w-full flex flex-col items-center justify-center snap-center px-4">
+        <section className="h-[100dvh] w-full flex flex-col items-center justify-center snap-center px-4">
           <motion.h1 
             initial={{ opacity: 0, y: -30 }}
             whileInView={{ opacity: 1, y: 0 }}
@@ -146,7 +99,7 @@ export default function EnginePortal() {
           </motion.h1>
         </section>
 
-        <section className="h-screen w-full flex flex-col items-center justify-center snap-center px-4">
+        <section className="h-[100dvh] w-full flex flex-col items-center justify-center snap-center px-4">
           <motion.h1 
             initial={{ opacity: 0, scale: 1.1 }}
             whileInView={{ opacity: 1, scale: 1 }}
@@ -158,7 +111,7 @@ export default function EnginePortal() {
           </motion.h1>
         </section>
 
-        <section className="h-screen w-full flex flex-col items-center justify-center snap-center px-4">
+        <section className="h-[100dvh] w-full flex flex-col items-center justify-center snap-center px-4">
           <motion.h1 
             initial={{ opacity: 0, scale: 0.8 }}
             whileInView={{ opacity: 1, scale: 1.1 }}
@@ -171,7 +124,7 @@ export default function EnginePortal() {
         </section>
 
         {/* FINALLY THE THOUGHT BOX */}
-        <section ref={inputSectionRef} className="min-h-screen w-full flex flex-col items-center justify-center p-6 snap-center">
+        <section ref={inputSectionRef} className="min-h-[100dvh] w-full flex flex-col items-center justify-center p-6 snap-center">
           <AnimatePresence mode="wait">
             {isGenerating ? (
               <motion.div
@@ -248,7 +201,7 @@ export default function EnginePortal() {
             )}
           </AnimatePresence>
         </section>
-      </motion.div>
+      </div>
 
     </main>
   );
