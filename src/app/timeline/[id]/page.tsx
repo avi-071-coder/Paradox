@@ -134,24 +134,12 @@ interface PageProps {
 // -------------------------------------------------------------
 function HeroCondense({ data, act2Prompt, vectorId }: { data: any, act2Prompt: string, vectorId: string }) {
   const ref = useRef(null);
-  const { scrollYProgress } = useScroll({
-    target: ref,
-    offset: ["start start", "end start"]
-  });
-
-  // Scale down from full screen to a small box ONLY after the user scrolls past the first fold (progress 0.5 to 0.9)
-  const scale = useTransform(scrollYProgress, [0.5, 0.9], [1, 0.15]);
-  // Round corners as it shrinks
-  const borderRadius = useTransform(scrollYProgress, [0.5, 0.9], ["0vw", "12vw"]);
-  
-
 
   return (
     <section ref={ref} className="relative w-full h-[220vh] bg-[#070708]">
-      {/* Sticky Background Box (Condenses LATER) */}
+      {/* Sticky Background Box */}
       <div className="sticky top-0 w-full h-screen overflow-hidden flex items-center justify-center z-0 pointer-events-none">
-        <motion.div 
-          style={{ scale, borderRadius }}
+        <div 
           className="relative w-full h-full overflow-hidden shadow-[0_0_100px_rgba(0,0,0,1)] bg-black"
         >
           {/* Image */}
@@ -165,7 +153,7 @@ function HeroCondense({ data, act2Prompt, vectorId }: { data: any, act2Prompt: s
           {/* Solid gradient that stays in the box */}
           <div className="absolute inset-0 bg-gradient-to-r from-[#070708]/90 via-[#070708]/40 to-transparent" />
           <div className="absolute inset-0 bg-gradient-to-t from-[#070708] to-transparent opacity-80" />
-        </motion.div>
+        </div>
       </div>
 
       {/* Natural Scrolling Foreground Content */}
